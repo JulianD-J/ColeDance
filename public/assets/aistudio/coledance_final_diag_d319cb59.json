@@ -1,0 +1,283 @@
+{
+  "reportType": "ColeDance_System_Diagnostics",
+  "generatedAt": "2026-11-01T13:45:03.268Z",
+  "summary": {
+    "totalTests": 9,
+    "passedTests": 4,
+    "warnings": 3,
+    "failedTests": 2
+  },
+  "evidenceDiagnosis": {
+    "symptom1_PurpleBorderStatic": "Explained by synthetic fallback template in yoloPoseTracker emitting constant coordinates when ONNX session fails to initialize.",
+    "symptom2_VideoHalfwayCutoff": "Explained by `const duration = Math.min(video.duration || 60, 120)` in TrainingStudio.tsx capping extraction at exactly 120s (1:59).",
+    "symptom3_StandingStillSpammingPoints": "Because both coach JSON coordinates and player webcam fallback coordinates are frozen to the identical static numbers, similarity math outputs 100% match.",
+    "symptom4_ResultsScoreZero": "Active players score in GameplayScreen state is lost or reset during routine end closure callback to App.tsx."
+  },
+  "testResults": [
+    {
+      "id": "env-iframe",
+      "name": "Runtime Context & Isolation",
+      "category": "Environment",
+      "status": "PASS",
+      "details": "Running in top-level browser window. Full hardware isolation supported.",
+      "data": {
+        "inIframe": false,
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+        "screen": "1366x768",
+        "viewport": "1310x671",
+        "devicePixelRatio": 1
+      }
+    },
+    {
+      "id": "env-hardware",
+      "name": "Hardware Concurrency & Memory",
+      "category": "Environment",
+      "status": "PASS",
+      "details": "CPU Cores: 6 • Estimated Device RAM: 4 GB",
+      "data": {
+        "hardwareConcurrency": 6,
+        "deviceMemory": 4
+      }
+    },
+    {
+      "id": "wasm-features",
+      "name": "WebAssembly & SIMD Acceleration",
+      "category": "Environment",
+      "status": "WARN",
+      "details": "WebAssembly supported. SIMD vector acceleration: Unavailable (WASM fallback active)",
+      "data": {
+        "hasWasm": true,
+        "hasWasmSimd": false,
+        "numThreads": 1
+      }
+    },
+    {
+      "id": "onnx-yolo-session",
+      "name": "YOLOv8-Pose ONNX Neural Engine",
+      "category": "ONNX / YOLO",
+      "status": "FAIL",
+      "details": "Model binary failed to create inference session: no available backend found. ERR: [wasm] TypeError: Failed to fetch dynamically imported module: https://ais-pre-lwdirxdcize4avzlvipx2o-321722490442.us-west2.run.app/ort-wasm-simd-threaded.jsep.mjs. Vision Pose fallback is handling inputs.",
+      "data": {
+        "modelFetchStatus": "PASS",
+        "modelSizeBytes": 13484153,
+        "sessionCreation": "FAIL",
+        "error": "no available backend found. ERR: [wasm] TypeError: Failed to fetch dynamically imported module: https://ais-pre-lwdirxdcize4avzlvipx2o-321722490442.us-west2.run.app/ort-wasm-simd-threaded.jsep.mjs",
+        "wasmPaths": "/"
+      }
+    },
+    {
+      "id": "video-duration-cap",
+      "name": "Video Duration 120-Second Cap Audit",
+      "category": "Video & Trimming",
+      "status": "WARN",
+      "details": "Detected hardcoded cap: `Math.min(video.duration || 60, 120)` in TrainingStudio. Videos longer than 2 minutes (like Coldplay Viva La Vida at 4:47) get cut off exactly at 1:59 (120s). Needs unlimited dynamic duration.",
+      "data": {
+        "hardcodedCapSeconds": 120,
+        "symptomVerified": "Video scanner stops at 1:59 and reports 100% complete.",
+        "requiredFix": "Remove 120s clamp; use actual video.duration with user-defined start & end trim times."
+      }
+    },
+    {
+      "id": "camera-hardware",
+      "name": "Hardware Camera Device Enumeration",
+      "category": "Camera & Motion",
+      "status": "PASS",
+      "details": "Found 1 physical video input device(s).",
+      "data": {
+        "hasCamera": true,
+        "isChecking": false,
+        "deviceCount": 1
+      }
+    },
+    {
+      "id": "coordinate-dynamics",
+      "name": "JSON Keypoint Dynamics & Coordinate Drift",
+      "category": "ONNX / YOLO",
+      "status": "FAIL",
+      "details": "STATIC COORDINATES CONFIRMED: 342 frames in \"Just Dance 2026 Edition_ Viva La Vida by Coldplay_ Full Gameplay [PaffzfmJ4-M]\" have identical stationary coordinates down to 16 decimal places!",
+      "data": {
+        "sampleSongTitle": "Just Dance 2026 Edition_ Viva La Vida by Coldplay_ Full Gameplay [PaffzfmJ4-M]",
+        "hasDuplicateCoordinates": true,
+        "frameCount": 342
+      }
+    },
+    {
+      "id": "scoring-state-transfer",
+      "name": "Gameplay to Results Score Transfer",
+      "category": "Scoring & State",
+      "status": "WARN",
+      "details": "Detected potential state synchronization issue: GameplayScreen manages internal `activePlayers` state, but upon song completion (`handleFinish`), if the parent callback receives default props or an un-updated player array, player score is read as 0 PTS.",
+      "data": {
+        "stateMechanism": "GameplayScreen activePlayers -> onFinishRoutine(updatedPlayers) -> App.tsx setPlayers -> ResultsScreen players",
+        "potentialFailure": "Countdown timer calling handleFinish with stale closure of players."
+      }
+    },
+    {
+      "id": "storage-indexeddb",
+      "name": "IndexedDB Offline Video Storage",
+      "category": "Video & Trimming",
+      "status": "PASS",
+      "details": "IndexedDB active. Found 4 locally stored high-res coach video blob(s).",
+      "data": {
+        "storedVideoCount": 4,
+        "localStorageKeys": [
+          "coledance_custom_trained_songs_v3",
+          "coledance_vip_active",
+          "coledance_deleted_songs_v1",
+          "coledance_custom_trained_songs_v2",
+          "coledance_menu_music_muted"
+        ]
+      }
+    }
+  ],
+  "liveCameraTelemetry": {
+    "cameraActive": true,
+    "isCoordinateFrozen": true,
+    "variance": 2.7733391199176196e-32,
+    "latestDetectionCount": 1,
+    "sampleKeypoints": [
+      {
+        "x": 0.39999999999999997,
+        "y": 0.11800000000000001,
+        "confidence": 0.92
+      },
+      {
+        "x": 0.37999999999999995,
+        "y": 0.101,
+        "confidence": 0.9
+      },
+      {
+        "x": 0.42,
+        "y": 0.101,
+        "confidence": 0.9
+      },
+      {
+        "x": 0.36,
+        "y": 0.11800000000000001,
+        "confidence": 0.88
+      },
+      {
+        "x": 0.43999999999999995,
+        "y": 0.11800000000000001,
+        "confidence": 0.88
+      }
+    ]
+  },
+  "videoTestbench": {
+    "videoLoaded": true,
+    "fileName": "Just Dance 2026 Edition_ Counting Stars by OneRepublic - Full Gameplay [leOtmfsGpJs].mp4",
+    "durationSeconds": 323.361088,
+    "trimRange": {
+      "start": 45,
+      "end": 306
+    },
+    "sampleScanResults": [
+      {
+        "timestamp": "45.00",
+        "coachCount": 1,
+        "nose": {
+          "x": "0.4000",
+          "y": "0.1180"
+        },
+        "leftWrist": {
+          "x": "0.2250",
+          "y": "0.4750"
+        },
+        "bbox": {
+          "x": 0.05,
+          "y": 0.05,
+          "width": 0.7,
+          "height": 0.85
+        }
+      },
+      {
+        "timestamp": "97.20",
+        "coachCount": 1,
+        "nose": {
+          "x": "0.4000",
+          "y": "0.1180"
+        },
+        "leftWrist": {
+          "x": "0.2250",
+          "y": "0.4750"
+        },
+        "bbox": {
+          "x": 0.05,
+          "y": 0.05,
+          "width": 0.7,
+          "height": 0.85
+        }
+      },
+      {
+        "timestamp": "149.40",
+        "coachCount": 1,
+        "nose": {
+          "x": "0.4000",
+          "y": "0.1180"
+        },
+        "leftWrist": {
+          "x": "0.2250",
+          "y": "0.4750"
+        },
+        "bbox": {
+          "x": 0.05,
+          "y": 0.05,
+          "width": 0.7,
+          "height": 0.85
+        }
+      },
+      {
+        "timestamp": "201.60",
+        "coachCount": 1,
+        "nose": {
+          "x": "0.4000",
+          "y": "0.1180"
+        },
+        "leftWrist": {
+          "x": "0.2250",
+          "y": "0.4750"
+        },
+        "bbox": {
+          "x": 0.05,
+          "y": 0.05,
+          "width": 0.7,
+          "height": 0.85
+        }
+      },
+      {
+        "timestamp": "253.80",
+        "coachCount": 1,
+        "nose": {
+          "x": "0.4000",
+          "y": "0.1180"
+        },
+        "leftWrist": {
+          "x": "0.2250",
+          "y": "0.4750"
+        },
+        "bbox": {
+          "x": 0.05,
+          "y": 0.05,
+          "width": 0.7,
+          "height": 0.85
+        }
+      }
+    ]
+  },
+  "systemLogs": [
+    "[13:44:55.584] Exported coledance_diagnostics.json to user downloads!",
+    "[13:44:48.951] ⚠️ WARNING: Sample video scan produced identical coordinates across different timestamps!",
+    "[13:44:47.454] Running testbench 5-frame sample scan between 45s and 306s...",
+    "[13:44:01.405] Video metadata parsed: Duration = 323.36s (5m 23s), Dimensions = 1920x1080",
+    "[13:44:01.258] Loaded testbench video: \"Just Dance 2026 Edition_ Counting Stars by OneRepublic - Full Gameplay [leOtmfsGpJs].mp4\" (87.9 MB)",
+    "[13:43:42.576] Exported coledance_diagnostics.json to user downloads!",
+    "[13:43:10.453] Exported coledance_diagnostics.json to user downloads!",
+    "[13:42:53.862] All diagnostics completed! Ready for JSON Export.",
+    "[13:42:53.782] InferenceSession creation failed: no available backend found. ERR: [wasm] TypeError: Failed to fetch dynamically imported module: https://ais-pre-lwdirxdcize4avzlvipx2o-321722490442.us-west2.run.app/ort-wasm-simd-threaded.jsep.mjs",
+    "[13:42:53.585] Model binary fetched successfully! Size: 12.86 MB",
+    "[13:42:48.192] Testing ONNX Runtime Web model binary fetch (/models/yolov8n-pose.onnx)...",
+    "[13:42:48.187] Starting Comprehensive ColeDance Diagnostics..."
+  ]
+}

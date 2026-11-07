@@ -1,0 +1,6 @@
+{
+  "name": "ColeDance - Ultimate Motion Dance Experience",
+  "description": "Play ColeDance with webcam AI pose detection or phone controllers! Dance to top hits, earn Megastar ranks, and compete live with friends.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

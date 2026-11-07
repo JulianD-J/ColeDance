@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Just Dance UI Mockup</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Montserrat & Rajdhani for exact modern JD gaming UI -->
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,600;0,800;0,900;1,800;1,900&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Montserrat', 'sans-serif'],
+                        rajdhani: ['Rajdhani', 'sans-serif'],
+                    },
+                    colors: {
+                        jdBg: '#2d0959',
+                        jdSidebar: '#0f0c2e',
+                        jdAccentPink: '#ff1493',
+                        jdAccentBlue: '#00d2ff',
+                        jdYellow: '#ffea00',
+                        jdPurple: '#4a0e78',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background: #11052c url('https://static.wikia.nocookie.net/justdance/images/d/d6/TitleScreenBase.png/revision/latest/scale-to-width-down/250?cb=20221210025734') no-repeat center center fixed;
+            background-size: cover;
+            color: #ffffff;
+            user-select: none;
+            overflow-x: hidden;
+        }
+
+        /* Glassmorphism & Neon Glows matching JD */
+        .jd-glass {
+            background: rgba(20, 10, 45, 0.65);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+        .jd-sidebar-glow {
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
+        }
+        .jd-glow-pink {
+            filter: drop-shadow(0 0 8px rgba(255, 20, 147, 0.8));
+        }
+        .jd-glow-cyan {
+            filter: drop-shadow(0 0 8px rgba(0, 210, 255, 0.8));
+        }
+
+        /* Ambient overlay over background image */
+        .bg-jd-rays {
+            background-image: radial-gradient(circle at 50% 50%, rgba(120, 30, 180, 0.15) 0%, rgba(15, 5, 35, 0.7) 100%);
+        }
+
+        /* Custom scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.2);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #ff1493;
+            border-radius: 999px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex text-white relative bg-jd-rays">
+
+    <!-- ================= LEFT VERTICAL SIDEBAR ================= -->
+    <aside class="fixed left-3 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center py-4 px-2 bg-[#09051d]/85 border border-white/10 rounded-full shadow-2xl space-y-3 backdrop-blur-md">
+        <button onclick="switchNav('songs')" title="Search" class="nav-btn w-10 h-10 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition">
+            <i class="fa-solid fa-magnifying-glass text-sm"></i>
+        </button>
+        <!-- Notifications -->
+        <button onclick="showModal('Notifications', 'You have 3 new song unlock notifications!')" title="Notifications" class="nav-btn w-10 h-10 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition relative">
+            <i class="fa-solid fa-bell text-sm"></i>
+            <span class="absolute top-1 right-1 w-2 h-2 bg-jdAccentPink rounded-full animate-ping"></span>
+        </button>
+
+        <div class="w-6 h-[1px] bg-white/10 my-1"></div>
+
+        <!-- Home -->
+        <button onclick="switchNav('home')" id="nav-home" title="Home" class="nav-btn w-10 h-10 rounded-full bg-jdAccentPink text-white flex items-center justify-center shadow-lg transition">
+            <i class="fa-solid fa-house text-sm"></i>
+        </button>
+        <!-- Songs -->
+        <button onclick="switchNav('songs')" id="nav-songs" title="Song Catalog" class="nav-btn w-10 h-10 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition">
+            <i class="fa-solid fa-music text-sm"></i>
+        </button>
+        <!-- Playlists / Workout -->
+        <button onclick="switchNav('coaches')" id="nav-coaches" title="Coaches & Playlists" class="nav-btn w-10 h-10 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition">
+            <i class="fa-solid fa-flask text-sm"></i>
+        </button>
+
+        <div class="w-6 h-[1px] bg-white/10 my-1"></div>
+
+        <!-- Profile -->
+        <button onclick="showModal('Dancer Card', 'Player Level 42 - Megastar rank achieved across 128 songs!')" title="Dancer Card" class="nav-btn w-10 h-10 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition">
+            <i class="fa-solid fa-address-card text-sm"></i>
+        </button>
+        <!-- Store -->
+        <button onclick="showModal('Just Dance+ Store', 'Subscribe to JD+ for 500+ extra songs and weekly releases!')" title="Store" class="nav-btn w-10 h-10 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition">
+            <i class="fa-solid fa-shopping-bag text-sm"></i>
+        </button>
+        <!-- Settings -->
+        <button onclick="showModal('Settings', 'Adjust Audio, Controller sync, and Video Quality settings.')" title="Settings" class="nav-btn w-10 h-10 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition">
+            <i class="fa-solid fa-gear text-sm"></i>
+        </button>
+    </aside>
+
+    <!-- ================= RIGHT PARTY / CONTROLLER PANEL ================= -->
+    <aside class="fixed right-3 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center py-4 px-2 bg-jdSidebar/80 border border-white/10 rounded-full shadow-2xl space-y-4 backdrop-blur-md">
+        <button onclick="showModal('Multiplayer Lobby', '4 Controllers connected via Just Dance Controller App')" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-xs">
+            <i class="fa-solid fa-border-all"></i>
+        </button>
+
+        <!-- Player 1 Active Avatar Badge -->
+        <div class="relative group cursor-pointer" onclick="showModal('Dancer Card', 'Primary Player 1 (Active)')">
+            <div class="w-11 h-11 rounded-full p-0.5 bg-gradient-to-r from-jdYellow to-jdAccentPink shadow-lg">
+                <img src="https://api.dicebear.com/7.x/bottts/svg?seed=PandaJD" class="w-full h-full rounded-full bg-indigo-900 object-cover" alt="Avatar">
+            </div>
+            <span class="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-jdSidebar"></span>
+        </div>
+
+        <!-- Add Player / Controller -->
+        <button onclick="showModal('Connect Smartphone', 'Scan QR Code on the Just Dance Controller App to join as Player 2!')" class="w-9 h-9 rounded-full bg-indigo-800/80 hover:bg-jdAccentPink transition flex items-center justify-center text-white text-xs border border-white/20 shadow-lg">
+            <i class="fa-solid fa-plus"></i>
+        </button>
+    </aside>
+
+    <!-- ================= MAIN SCREEN CONTAINER ================= -->
+    <main class="flex-1 pl-20 pr-20 py-6 min-h-screen flex flex-col justify-between">
+
+        <!-- top status header -->
+        <header class="flex justify-between items-center w-full mb-4">
+            <div class="flex items-center space-x-3">
+                <span class="text-2xl font-black italic tracking-wider text-white">JUST <span class="text-jdAccentPink">DANCE</span></span>
+                <span class="text-[10px] font-bold bg-white/10 px-2 py-0.5 rounded-md border border-white/20">2026 EDITION</span>
+            </div>
+            <div class="flex items-center space-x-2 text-xs font-bold bg-black/40 border border-white/10 px-3 py-1.5 rounded-full">
+                <i class="fa-solid fa-wifi text-emerald-400"></i>
+                <span>ONLINE - JD+ VIP ACTIVE</span>
+            </div>
+        </header>
+
+        <!-- SCREEN 1: HOME SCREEN -->
+        <section id="screen-home" class="screen-view flex-1 flex flex-col space-y-6">
+            <!-- Big Banner Slider -->
+            <div class="relative w-full h-80 rounded-3xl overflow-hidden border border-white/20 shadow-2xl bg-gradient-to-r from-purple-900/80 via-indigo-900/80 to-pink-900/80 backdrop-blur-md flex items-center px-10">
+                <div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?q=80&w=1200&auto=format&fit=crop')] bg-cover bg-center opacity-25 mix-blend-overlay"></div>
+                
+                <!-- Hero content -->
+                <div class="relative z-10 max-w-xl space-y-4">
+                    <div class="text-jdAccentBlue font-bold italic tracking-widest text-sm uppercase">UBISOFT ORIGINAL</div>
+                    <h1 class="text-5xl font-black italic tracking-tight leading-none drop-shadow-lg">
+                        Welcome to<br>
+                        <span class="text-transparent bg-clip-text bg-gradient-to-r from-jdAccentPink via-jdYellow to-jdAccentBlue">JUST DANCE 2026</span>
+                    </h1>
+                    <p class="text-xs text-white/80 font-medium">Jump into Just Dance 2026 Edition hits now! Dance to over 40 original tracks and new routines.</p>
+                    
+                    <div class="pt-2 flex items-center space-x-4">
+                        <button onclick="switchNav('songs')" class="px-8 py-3.5 bg-gradient-to-r from-jdAccentPink to-rose-600 hover:scale-105 transition font-black italic text-sm rounded-full shadow-2xl flex items-center space-x-2 border border-white/30">
+                            <span>DANCE NOW</span>
+                            <i class="fa-solid fa-play text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Floating Coach Preview visuals on right side of banner -->
+                <div class="hidden lg:flex absolute right-12 bottom-0 items-end space-x-[-30px] opacity-90">
+                    <img src="https://api.dicebear.com/7.x/big-smile/svg?seed=Coach1" class="w-48 h-60 object-contain drop-shadow-[0_0_20px_rgba(255,20,147,0.5)]">
+                    <img src="https://api.dicebear.com/7.x/big-smile/svg?seed=Coach2" class="w-56 h-72 object-contain drop-shadow-[0_0_25px_rgba(0,210,255,0.6)] z-10">
+                    <img src="https://api.dicebear.com/7.x/big-smile/svg?seed=Coach3" class="w-48 h-60 object-contain drop-shadow-[0_0_20px_rgba(255,234,0,0.5)]">
+                </div>
+            </div>
+
+            <!-- Songs Horizontal Carousel Title -->
+            <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-xs font-black tracking-widest text-white/80 uppercase">JUST DANCE 2026 EDITION SONGS</h2>
+                    <button onclick="switchNav('songs')" class="text-xs text-jdAccentBlue font-bold hover:underline">See All (42)</button>
+                </div>
+
+                <!-- Song cards Row -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <!-- Song Card 1 -->
+                    <div onclick="openSongReady('APT.', 'ROSÉ & Bruno Mars', 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500')" class="group relative bg-[#130b33]/80 backdrop-blur-md rounded-2xl overflow-hidden border border-white/10 hover:border-jdAccentPink cursor-pointer transition-all hover:scale-105 shadow-lg">
+                        <div class="h-32 bg-slate-800 relative overflow-hidden">
+                            <img src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500" class="w-full h-full object-cover group-hover:scale-110 transition duration-500">
+                            <div class="absolute top-2 right-2 bg-black/60 backdrop-blur-md p-1 rounded-md text-[10px] text-jdAccentBlue">
+                                <i class="fa-solid fa-video"></i>
+                            </div>
+                        </div>
+                        <div class="p-3 space-y-1">
+                            <div class="font-black italic text-sm truncate">APT.</div>
+                            <div class="text-[11px] text-white/60 truncate">ROSÉ & Bruno Mars</div>
+                            <div class="flex items-center space-x-1 text-jdYellow text-[10px] pt-1">
+                                <i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Song Card 2 -->
+                    <div onclick="openSongReady('Good Luck, Babe!', 'Chappell Roan', 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500')" class="group relative bg-[#130b33]/80 backdrop-blur-md rounded-2xl overflow-hidden border border-white/10 hover:border-jdAccentPink cursor-pointer transition-all hover:scale-105 shadow-lg">
+                        <div class="h-32 bg-slate-800 relative overflow-hidden">
+                            <img src="https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500" class="w-full h-full object-cover group-hover:scale-110 transition duration-500">
+                        </div>
+                        <div class="p-3 space-y-1">
+                            <div class="font-black italic text-sm truncate">Good Luck, Babe!</div>
+                            <div class="text-[11px] text-white/60 truncate">Chappell Roan</div>
+                            <div class="flex items-center space-x-1 text-jdYellow text-[10px] pt-1">
+                                <i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-regular fa-star text-white/30"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Song Card 3 -->
+                    <div onclick="openSongReady('ABRACADABRA', 'Lady Gaga', 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=500')" class="group relative bg-[#130b33]/80 backdrop-blur-md rounded-2xl overflow-hidden border border-white/10 hover:border-jdAccentPink cursor-pointer transition-all hover:scale-105 shadow-lg">
+                        <div class="h-32 bg-slate-800 relative overflow-hidden">
+                            <img src="https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=500" class="w-full h-full object-cover group-hover:scale-110 transition duration-500">
+                        </div>
+                        <div class="p-3 space-y-1">
+                            <div class="font-black italic text-sm truncate">ABRACADABRA</div>
+                            <div class="text-[11px] text-white/60 truncate">Lady Gaga</div>
+                            <div class="flex items-center space-x-1 text-jdYellow text-[10px] pt-1">
+                                <i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Song Card 4 -->
+                    <div onclick="openSongReady('BLUEY THEME', 'Bluey Cast', 'https://images.unsplash.com/photo-1560169897-fc0cdbdfa4d5?w=500')" class="group relative bg-[#130b33]/80 backdrop-blur-md rounded-2xl overflow-hidden border border-white/10 hover:border-jdAccentPink cursor-pointer transition-all hover:scale-105 shadow-lg">
+                        <div class="h-32 bg-slate-800 relative overflow-hidden">
+                            <img src="https://images.unsplash.com/photo-1560169897-fc0cdbdfa4d5?w=500" class="w-full h-full object-cover group-hover:scale-110 transition duration-500">
+                        </div>
+                        <div class="p-3 space-y-1">
+                            <div class="font-black italic text-sm truncate">BLUEY THEME</div>
+                            <div class="text-[11px] text-white/60 truncate">Bluey Cast</div>
+                            <div class="flex items-center space-x-1 text-jdYellow text-[10px] pt-1">
+                                <i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-regular fa-star text-white/30"></i><i class="fa-regular fa-star text-white/30"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCREEN 2: SONG CATALOG & FILTERS SCREEN -->
+        <section id="screen-songs" class="screen-view hidden flex-1 flex space-x-6">
+            <!-- Left Song Grid -->
+            <div class="flex-1 space-y-4">
+                <!-- Random Song Wheel Banner -->
+                <div onclick="triggerRandomSong()" class="w-full p-3 rounded-2xl bg-gradient-to-r from-indigo-800 via-purple-700 to-pink-600 flex items-center justify-between cursor-pointer hover:scale-[1.01] transition shadow-lg border border-white/20">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 rounded-xl bg-jdYellow text-black flex items-center justify-center text-lg font-black">
+                            <i class="fa-solid fa-shuffle"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs font-extrabold uppercase text-jdYellow">Surprise Me!</div>
+                            <div class="text-xs text-white/80">Spin the wheel to play a random song from your library</div>
+                        </div>
+                    </div>
+                    <button class="px-4 py-1.5 bg-jdAccentPink text-white text-xs font-black rounded-full shadow">Spin!</button>
+                </div>
+
+                <!-- Search and Grid -->
+                <div class="grid grid-cols-3 gap-4" id="song-catalog-grid">
+                    <!-- Populated dynamically via JS -->
+                </div>
+            </div>
+
+            <!-- Right Filter Bar (Exact Just Dance UI sidebar filters) -->
+            <div class="w-64 bg-jdSidebar/60 rounded-2xl p-4 border border-white/10 space-y-3 h-fit backdrop-blur-md">
+                <div class="text-xs font-bold text-white/50 uppercase tracking-widest pb-1 border-b border-white/10 flex justify-between items-center">
+                    <span>Filter & Sort</span>
+                    <i class="fa-solid fa-filter"></i>
+                </div>
+
+                <div class="space-y-2">
+                    <button class="w-full text-left text-xs font-extrabold py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 flex justify-between items-center">
+                        <span>Choreography Style</span>
+                        <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                    </button>
+                    <button class="w-full text-left text-xs font-extrabold py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 flex justify-between items-center">
+                        <span>Music Genres</span>
+                        <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                    </button>
+                    <button class="w-full text-left text-xs font-extrabold py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 flex justify-between items-center">
+                        <span>Mood & Vibe</span>
+                        <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                    </button>
+                    <button class="w-full text-left text-xs font-extrabold py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 flex justify-between items-center">
+                        <span>Decades</span>
+                        <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                    </button>
+                    <button class="w-full text-left text-xs font-extrabold py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 flex justify-between items-center">
+                        <span>Accessibility</span>
+                        <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCREEN 3: SELECT YOUR COACH SCREEN -->
+        <section id="screen-coaches" class="screen-view hidden flex-1 flex flex-col items-center justify-center space-y-6">
+            <h2 class="text-3xl font-black italic text-jdAccentPink drop-shadow-md">Select your Coach</h2>
+
+            <div class="flex items-center space-x-6">
+                <!-- Coach 1 -->
+                <div onclick="startDanceRoutine('Eunji')" class="group relative w-56 h-80 rounded-2xl overflow-hidden border-2 border-white/20 hover:border-jdAccentPink bg-gradient-to-t from-pink-900 to-indigo-900 p-4 flex flex-col justify-between cursor-pointer transition transform hover:scale-105 shadow-2xl">
+                    <div class="text-center">
+                        <span class="bg-black/50 px-3 py-1 rounded-full text-[10px] font-bold text-jdAccentBlue">Routine A</span>
+                    </div>
+                    <img src="https://api.dicebear.com/7.x/big-smile/svg?seed=Eunji" class="w-full h-48 object-contain">
+                    <div class="bg-jdSidebar/90 py-2 rounded-xl text-center font-black italic text-sm border border-white/10">
+                        Eunji
+                    </div>
+                </div>
+
+                <!-- Coach 2 -->
+                <div onclick="startDanceRoutine('Iseul')" class="group relative w-56 h-80 rounded-2xl overflow-hidden border-2 border-white/20 hover:border-jdYellow bg-gradient-to-t from-amber-900 to-indigo-900 p-4 flex flex-col justify-between cursor-pointer transition transform hover:scale-105 shadow-2xl">
+                    <div class="text-center">
+                        <span class="bg-black/50 px-3 py-1 rounded-full text-[10px] font-bold text-jdYellow">Routine B</span>
+                    </div>
+                    <img src="https://api.dicebear.com/7.x/big-smile/svg?seed=Iseul" class="w-full h-48 object-contain">
+                    <div class="bg-jdSidebar/90 py-2 rounded-xl text-center font-black italic text-sm border border-white/10">
+                        Iseul
+                    </div>
+                </div>
+
+                <!-- Coach 3 -->
+                <div onclick="startDanceRoutine('Byeol')" class="group relative w-56 h-80 rounded-2xl overflow-hidden border-2 border-white/20 hover:border-jdAccentBlue bg-gradient-to-t from-cyan-900 to-indigo-900 p-4 flex flex-col justify-between cursor-pointer transition transform hover:scale-105 shadow-2xl">
+                    <div class="text-center">
+                        <span class="bg-black/50 px-3 py-1 rounded-full text-[10px] font-bold text-jdAccentPink">Routine C</span>
+                    </div>
+                    <img src="https://api.dicebear.com/7.x/big-smile/svg?seed=Byeol" class="w-full h-48 object-contain">
+                    <div class="bg-jdSidebar/90 py-2 rounded-xl text-center font-black italic text-sm border border-white/10">
+                        Byeol
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCREEN 4: GAMEPLAY / IN-DANCE SCREEN -->
+        <section id="screen-gameplay" class="screen-view hidden fixed inset-0 z-50 bg-slate-900 flex flex-col justify-between p-6">
+            <!-- Background simulated Stage / Dancing Canvas -->
+            <div class="absolute inset-0 bg-[url('https://static.wikia.nocookie.net/justdance/images/d/d6/TitleScreenBase.png/revision/latest/scale-to-width-down/250?cb=20221210025734')] bg-cover bg-center opacity-60"></div>
+            <div class="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/80"></div>
+
+            <!-- Top Scoring HUD for Players -->
+            <div class="relative z-10 flex justify-center space-x-6 items-start">
+                <!-- Player 1 Score HUD -->
+                <div class="flex flex-col items-center space-y-1">
+                    <div class="text-xs font-black text-white bg-black/60 px-3 py-0.5 rounded-full border border-white/20">Jazzy</div>
+                    <div id="p1-feedback" class="text-xs font-black text-jdAccentPink uppercase tracking-widest bg-pink-900/80 px-2 py-0.5 rounded animate-bounce">PERFECT</div>
+                    <div id="p1-stars" class="flex text-jdYellow text-xs"><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i></div>
+                    <div id="p1-score" class="text-[11px] font-black tracking-widest text-jdYellow">8,450</div>
+                </div>
+
+                <!-- Player 2 Score HUD -->
+                <div class="flex flex-col items-center space-y-1 scale-110">
+                    <div class="text-xs font-black text-white bg-black/60 px-3 py-0.5 rounded-full border border-emerald-400">Sunny</div>
+                    <div id="p2-feedback" class="text-sm font-black text-emerald-400 uppercase tracking-widest bg-emerald-950/90 px-3 py-0.5 rounded shadow-[0_0_15px_#10b981]">YEAH!</div>
+                    <div id="p2-stars" class="flex text-jdYellow text-xs"><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i></div>
+                    <div id="p2-score" class="text-xs font-black tracking-widest text-emerald-300">11,820</div>
+                </div>
+
+                <!-- Player 3 Score HUD -->
+                <div class="flex flex-col items-center space-y-1">
+                    <div class="text-xs font-black text-white bg-black/60 px-3 py-0.5 rounded-full border border-white/20">Happy</div>
+                    <div id="p3-feedback" class="text-xs font-black text-jdAccentBlue uppercase tracking-widest bg-cyan-950/80 px-2 py-0.5 rounded">GOOD</div>
+                    <div id="p3-stars" class="flex text-jdYellow text-xs"><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i></div>
+                    <div id="p3-score" class="text-[11px] font-black tracking-widest text-cyan-300">6,100</div>
+                </div>
+            </div>
+
+            <!-- Animated Simulated Coach / Dancer -->
+            <div class="relative z-10 flex-1 flex justify-center items-center">
+                <div class="relative flex items-center justify-center">
+                    <div id="dance-glow" class="absolute w-72 h-72 rounded-full bg-jdAccentPink/30 blur-3xl animate-pulse"></div>
+                    <img id="simulated-coach" src="https://api.dicebear.com/7.x/big-smile/svg?seed=Eunji" class="h-80 object-contain drop-shadow-[0_0_35px_rgba(255,20,147,0.8)] transition-all duration-300 transform scale-100">
+                </div>
+            </div>
+
+            <!-- Bottom Pictogram Guidance Bar & Live Dynamic Cue -->
+            <div class="relative z-10 flex justify-between items-end">
+                <button onclick="exitDance()" class="px-4 py-2 bg-red-600/80 hover:bg-red-600 text-xs font-black rounded-full border border-white/20 shadow-lg">
+                    <i class="fa-solid fa-xmark mr-1"></i> Exit Routine
+                </button>
+
+                <!-- Pictograms Motion Tracker -->
+                <div class="flex items-center space-x-3">
+                    <div id="picto-box" class="bg-black/70 backdrop-blur-md p-3 rounded-2xl border-2 border-jdAccentPink flex items-center space-x-3 shadow-2xl transition-all">
+                        <div class="w-16 h-20 bg-jdAccentPink/20 border-2 border-jdAccentPink rounded-xl flex flex-col items-center justify-center text-jdAccentPink">
+                            <i id="picto-icon" class="fa-solid fa-person-raised-hand text-3xl animate-bounce"></i>
+                            <span id="picto-text" class="text-[9px] font-black mt-1">RAISE HAND</span>
+                        </div>
+                        <div class="w-12 h-16 bg-white/10 rounded-xl flex items-center justify-center text-white/40">
+                            <i class="fa-solid fa-person-walking text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal Dialog -->
+    <div id="modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md hidden">
+        <div class="bg-jdSidebar border border-jdAccentPink/50 rounded-3xl p-6 max-w-sm w-full space-y-4 text-center shadow-2xl">
+            <div class="w-12 h-12 bg-jdAccentPink/20 text-jdAccentPink rounded-2xl flex items-center justify-center mx-auto text-xl border border-jdAccentPink/40">
+                <i class="fa-solid fa-sparkles"></i>
+            </div>
+            <h3 id="modal-title" class="text-xl font-black italic">Modal Header</h3>
+            <p id="modal-body" class="text-xs text-white/70">Content body goes here...</p>
+            <button onclick="closeModal()" class="w-full py-2.5 bg-gradient-to-r from-jdAccentPink to-purple-600 text-white text-xs font-black rounded-xl">
+                CLOSE
+            </button>
+        </div>
+    </div>
+
+    <!-- Application Script -->
+    <script>
+        const songCatalog = [
+            { title: "Girls Just Want To Have Fun", artist: "Cyndi Lauper", diff: "Easy", img: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400" },
+            { title: "Feather", artist: "Sabrina Carpenter", diff: "Medium", img: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400" },
+            { title: "Physical", artist: "Dua Lipa", diff: "Hard", img: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400" },
+            { title: "Rather Be", artist: "Clean Bandit", diff: "Easy", img: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400" },
+            { title: "Locked Out Of Heaven", artist: "Bruno Mars", diff: "Medium", img: "https://images.unsplash.com/photo-1560169897-fc0cdbdfa4d5?w=400" },
+            { title: "MORE", artist: "K/DA", diff: "Extreme", img: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400" }
+        ];
+
+        let danceTimer = null;
+        const pictograms = [
+            { icon: "fa-person-raised-hand", text: "RAISE HAND", feedback: "PERFECT" },
+            { icon: "fa-person-walking", text: "SIDE STEP", feedback: "YEAH!" },
+            { icon: "fa-person-running", text: "SPIN AROUND", feedback: "SUPER" },
+            { icon: "fa-hands-clasping", text: "CLAP NOW", feedback: "GOOD" }
+        ];
+
+        function renderCatalog() {
+            const container = document.getElementById('song-catalog-grid');
+            if (!container) return;
+            container.innerHTML = songCatalog.map(song => `
+                <div onclick="openSongReady('${song.title}', '${song.artist}', '${song.img}')" class="group relative bg-[#130b33]/80 backdrop-blur-md rounded-2xl overflow-hidden border border-white/10 hover:border-jdAccentPink cursor-pointer transition-all hover:scale-105 shadow-lg">
+                    <div class="h-28 bg-slate-800 relative overflow-hidden">
+                        <img src="${song.img}" class="w-full h-full object-cover group-hover:scale-110 transition duration-500">
+                        <span class="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded text-[9px] font-bold text-jdYellow">
+                            ${song.diff}
+                        </span>
+                    </div>
+                    <div class="p-3">
+                        <div class="font-black italic text-xs truncate">${song.title}</div>
+                        <div class="text-[10px] text-white/60 truncate">${song.artist}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function switchNav(screenId) {
+            document.querySelectorAll('.screen-view').forEach(s => s.classList.add('hidden'));
+            const target = document.getElementById(`screen-${screenId}`);
+            if (target) target.classList.remove('hidden');
+
+            document.querySelectorAll('.nav-btn').forEach(b => {
+                b.classList.remove('bg-jdAccentPink', 'text-white');
+                b.classList.add('text-white/70');
+            });
+            const activeBtn = document.getElementById(`nav-${screenId}`);
+            if (activeBtn) {
+                activeBtn.classList.add('bg-jdAccentPink', 'text-white');
+                activeBtn.classList.remove('text-white/70');
+            }
+        }
+
+        function openSongReady(title, artist, img) {
+            switchNav('coaches');
+        }
+
+        function triggerRandomSong() {
+            const randomSong = songCatalog[Math.floor(Math.random() * songCatalog.length)];
+            openSongReady(randomSong.title, randomSong.artist, randomSong.img);
+        }
+
+        function startDanceRoutine(coachName) {
+            document.querySelectorAll('.screen-view').forEach(s => s.classList.add('hidden'));
+            document.getElementById('screen-gameplay').classList.remove('hidden');
+
+            const coachImg = document.getElementById('simulated-coach');
+            if (coachImg) {
+                coachImg.src = `https://api.dicebear.com/7.x/big-smile/svg?seed=${coachName}`;
+            }
+
+            let step = 0;
+            let score1 = 8450;
+            let score2 = 11820;
+            let score3 = 6100;
+
+            if (danceTimer) clearInterval(danceTimer);
+
+            danceTimer = setInterval(() => {
+                step = (step + 1) % pictograms.length;
+                const p = pictograms[step];
+
+                // Dynamic pictogram update
+                const pictoIcon = document.getElementById('picto-icon');
+                const pictoText = document.getElementById('picto-text');
+                if (pictoIcon && pictoText) {
+                    pictoIcon.className = `fa-solid ${p.icon} text-3xl animate-bounce`;
+                    pictoText.innerText = p.text;
+                }
+
+                // Simulate live score increments & feedback pops
+                score1 += Math.floor(Math.random() * 200) + 100;
+                score2 += Math.floor(Math.random() * 300) + 150;
+                score3 += Math.floor(Math.random() * 150) + 80;
+
+                const p1Score = document.getElementById('p1-score');
+                const p2Score = document.getElementById('p2-score');
+                const p3Score = document.getElementById('p3-score');
+                if (p1Score) p1Score.innerText = score1.toLocaleString();
+                if (p2Score) p2Score.innerText = score2.toLocaleString();
+                if (p3Score) p3Score.innerText = score3.toLocaleString();
+
+                const p2Feedback = document.getElementById('p2-feedback');
+                if (p2Feedback) p2Feedback.innerText = p.feedback;
+
+                // Animate coach transform
+                if (coachImg) {
+                    const scale = step % 2 === 0 ? 'scale-105 rotate-2' : 'scale-95 -rotate-2';
+                    coachImg.className = `h-80 object-contain drop-shadow-[0_0_35px_rgba(255,20,147,0.8)] transition-all duration-300 transform ${scale}`;
+                }
+            }, 1800);
+        }
+
+        function exitDance() {
+            if (danceTimer) clearInterval(danceTimer);
+            document.getElementById('screen-gameplay').classList.add('hidden');
+            switchNav('home');
+        }
+
+        function showModal(title, text) {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-body').innerText = text;
+            document.getElementById('modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.add('hidden');
+        }
+
+        window.onload = () => {
+            renderCatalog();
+        };
+    </script>
+</body>
+</html>
