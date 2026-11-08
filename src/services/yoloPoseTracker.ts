@@ -1,7 +1,7 @@
 import * as ort from 'onnxruntime-web';
 import { YoloPersonDetection, YoloKeypoint, YoloCoachFrame, TargetPoseType } from '../types/game';
 
-// Configure ONNX Runtime Web WASM paths to point directly to public root
+// Configure ONNX Runtime Web WASM paths
 ort.env.wasm.wasmPaths = '/';
 ort.env.wasm.numThreads = 1;
 ort.env.wasm.simd = false;
@@ -40,6 +40,13 @@ export interface YoloEvaluationResult {
   statusTip: string;
 }
 
+export interface CameraState {
+  hasPermission: boolean;
+  isActive: boolean;
+  error?: string;
+  deviceId?: string;
+}
+
 export class YoloPoseTracker {
   private session: ort.InferenceSession | null = null;
   private isModelLoading: boolean = false;
@@ -47,13 +54,16 @@ export class YoloPoseTracker {
   private canvasElement: HTMLCanvasElement | null = null;
   private canvasCtx: CanvasRenderingContext2D | null = null;
 
-  // Offscreen canvas for 640x640 letterbox tensor input
+  // Offscreen canvas for letterbox tensor input (preserves aspect ratio)
   private offscreenCanvas: HTMLCanvasElement;
   private offscreenCtx: CanvasRenderingContext2D | null;
+  private offscreenWidth = 640;
+  private offscreenHeight = 640;
 
   private isRunning: boolean = false;
   private isInferencing: boolean = false;
   private animFrameId: number | null = null;
+  private detectionLoopPromise: Promise<void> | null = null;
 
   private onMultiPersonDetectionsCallback?: (detections: YoloPersonDetection[]) => void;
   private previousDetectionsMap: Map<number, YoloPersonDetection> = new Map();
@@ -64,14 +74,28 @@ export class YoloPoseTracker {
   private iouThreshold: number = 0.45;
   private prevFrameData: Uint8ClampedArray | null = null;
 
+  // MediaPipe fallback
+  private mpPose: any = null;
+  private mpPoseInitialized: boolean = false;
+  private useMediaPipe: boolean = false;
+
+  // Camera state tracking
+  private cameraState: CameraState = {
+    hasPermission: false,
+    isActive: false,
+  };
+
   constructor() {
     this.offscreenCanvas = document.createElement('canvas');
-    this.offscreenCanvas.width = 640;
-    this.offscreenCanvas.height = 640;
+    this.offscreenCanvas.width = this.offscreenWidth;
+    this.offscreenCanvas.height = this.offscreenHeight;
     this.offscreenCtx = this.offscreenCanvas.getContext('2d', { willReadFrequently: true });
   }
 
-  private isUsingFallback: boolean = false;
+  private isUsingONNX: boolean = false;
+
+  // Model integrity hash (update when model changes)
+  private readonly MODEL_HASH = 'sha256-placeholder'; // Replace with actual hash
 
   async loadModel(): Promise<boolean> {
     if (this.session) return true;
@@ -85,67 +109,160 @@ export class YoloPoseTracker {
         throw new Error(`Model fetch failed with status ${response.status}`);
       }
       const modelBuffer = await response.arrayBuffer();
+      
+      // TODO: Verify model integrity hash here
+      // const hash = await this.computeHash(modelBuffer);
+      // if (hash !== this.MODEL_HASH) throw new Error('Model integrity check failed');
+
       this.session = await ort.InferenceSession.create(modelBuffer, {
         executionProviders: ['wasm'],
         graphOptimizationLevel: 'basic',
       });
       console.log('[YOLOv8-pose] ONNX Model loaded successfully! Inputs:', this.session.inputNames);
       this.isModelLoading = false;
-      this.isUsingFallback = false;
+      this.isUsingONNX = true;
+      this.useMediaPipe = false;
       return true;
     } catch (err) {
-      console.warn('[YOLOv8-pose] ONNX WASM initialization restricted or unavailable (e.g. iframe context). Activating high-performance real-time Vision Pose Tracker fallback:', err);
+      console.warn('[YOLOv8-pose] ONNX WASM initialization failed, will try MediaPipe:', err);
       this.isModelLoading = false;
-      this.isUsingFallback = true;
-      return true;
+      this.isUsingONNX = false;
+      // Don't return true here - let initialize() handle MediaPipe init
+      return false;
     }
   }
 
-  public getIsUsingFallback(): boolean {
-    return this.isUsingFallback;
+  private async initMediaPipe(): Promise<boolean> {
+    if (this.mpPoseInitialized) return !!this.mpPose;
+    
+    try {
+      // Dynamic import to avoid blocking main thread
+      const { PoseLandmarker, FilesetResolver } = await import('@mediapipe/tasks-vision');
+      
+      const vision = await FilesetResolver.forVisionTasks(
+        'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm'
+      );
+      
+      this.mpPose = await PoseLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task',
+          delegate: 'GPU', // Use WebGL acceleration
+        },
+        runningMode: 'VIDEO',
+        numPoses: 5,
+        minPoseDetectionConfidence: 0.5,
+        minPosePresenceConfidence: 0.5,
+        minTrackingConfidence: 0.5,
+        outputSegmentationMasks: false,
+      });
+      
+      this.mpPoseInitialized = true;
+      this.useMediaPipe = true;
+      console.log('[MediaPipe] PoseLandmarker initialized with GPU delegate');
+      return true;
+    } catch (err) {
+      console.error('[MediaPipe] Failed to initialize:', err);
+      this.useMediaPipe = false;
+      return false;
+    }
+  }
+
+  public getIsUsingONNX(): boolean {
+    return this.isUsingONNX;
+  }
+
+  public getIsUsingMediaPipe(): boolean {
+    return this.useMediaPipe;
+  }
+
+  public getCameraState(): CameraState {
+    return { ...this.cameraState };
   }
 
   async initialize(videoEl: HTMLVideoElement, canvasEl: HTMLCanvasElement): Promise<boolean> {
     this.videoElement = videoEl;
     this.canvasElement = canvasEl;
     this.canvasCtx = canvasEl.getContext('2d');
-    return this.loadModel();
+    
+    // Try ONNX first
+    const onnxLoaded = await this.loadModel();
+    if (onnxLoaded) return true;
+    
+    // Fallback to MediaPipe
+    console.log('[YOLOv8-pose] Initializing MediaPipe fallback...');
+    return this.initMediaPipe();
   }
 
-  async startCamera(): Promise<boolean> {
+  async startCamera(deviceId?: string): Promise<boolean> {
     if (!this.videoElement) return false;
+    
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
+      // Request permission explicitly first
+      const constraints: MediaStreamConstraints = {
+        video: {
+          width: { ideal: 640, min: 320, max: 1280 },
+          height: { ideal: 480, min: 240, max: 720 },
+          facingMode: 'user',
+          ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+        },
         audio: false,
-      });
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      
+      this.cameraState.hasPermission = true;
+      this.cameraState.isActive = true;
+      this.cameraState.deviceId = stream.getVideoTracks()[0]?.getSettings().deviceId;
+      
       this.videoElement.srcObject = stream;
       await this.videoElement.play();
+      
       this.isRunning = true;
       this.startDetectionLoop();
       return true;
-    } catch (err) {
+    } catch (err: any) {
       console.warn('[YOLOv8-pose] Camera access error:', err);
+      this.cameraState.error = err?.message || 'Camera access denied';
+      this.cameraState.hasPermission = err.name === 'NotAllowedError' ? false : true;
+      this.cameraState.isActive = false;
       return false;
     }
   }
 
   stopCamera() {
     this.isRunning = false;
+    
+    // Wait for detection loop to finish
+    if (this.detectionLoopPromise) {
+      this.detectionLoopPromise.catch(() => {});
+      this.detectionLoopPromise = null;
+    }
+    
     if (this.animFrameId) {
       cancelAnimationFrame(this.animFrameId);
       this.animFrameId = null;
     }
+    
     if (this.videoElement && this.videoElement.srcObject) {
       const stream = this.videoElement.srcObject as MediaStream;
       stream.getTracks().forEach((track) => track.stop());
       this.videoElement.srcObject = null;
     }
+    
     if (this.canvasCtx && this.canvasElement) {
       this.canvasCtx.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
     }
+    
+    this.cameraState.isActive = false;
     this.lastDetections = [];
     this.previousDetectionsMap.clear();
+  }
+
+  async switchCamera(deviceId: string): Promise<boolean> {
+    this.stopCamera();
+    // Small delay to ensure camera is released
+    await new Promise(r => setTimeout(r, 100));
+    return this.startCamera(deviceId);
   }
 
   setShowYoloDebugOverlay(show: boolean) {
@@ -158,20 +275,23 @@ export class YoloPoseTracker {
 
   private startDetectionLoop() {
     let lastInferenceTime = 0;
-    const targetIntervalMs = 100; // Run YOLO inference at ~10 FPS for smooth real-time performance
+    const targetIntervalMs = 100; // ~10 FPS for ONNX, MediaPipe can run faster
 
     const loop = async () => {
+      // Exit condition checked FIRST
       if (!this.isRunning || !this.videoElement || !this.canvasElement || !this.canvasCtx) {
         return;
       }
 
       const now = performance.now();
-      if (
+      const shouldInfer = (
         now - lastInferenceTime >= targetIntervalMs &&
         !this.isInferencing &&
         this.videoElement.readyState >= 2 &&
         !this.videoElement.paused
-      ) {
+      );
+
+      if (shouldInfer) {
         lastInferenceTime = now;
         this.isInferencing = true;
         try {
@@ -187,17 +307,24 @@ export class YoloPoseTracker {
         }
       }
 
-      // Render the latest detections on canvas smoothly every frame
-      this.renderDetections(this.lastDetections, this.canvasCtx, this.canvasElement.width, this.canvasElement.height);
+      // Always render latest detections smoothly
+      if (this.canvasCtx && this.canvasElement) {
+        this.renderDetections(this.lastDetections, this.canvasCtx, this.canvasElement.width, this.canvasElement.height);
+      }
 
-      this.animFrameId = requestAnimationFrame(loop);
+      // Only schedule next frame if still running
+      if (this.isRunning) {
+        this.animFrameId = requestAnimationFrame(loop);
+      }
     };
 
-    this.animFrameId = requestAnimationFrame(loop);
+    this.detectionLoopPromise = (async () => {
+      this.animFrameId = requestAnimationFrame(loop);
+    })();
   }
 
   /**
-   * Run real YOLOv8-pose ONNX inference on an HTMLVideoElement or HTMLCanvasElement
+   * Run YOLOv8-pose ONNX inference or MediaPipe on an HTMLVideoElement
    */
   public async detectPeopleInElement(
     sourceEl: HTMLVideoElement | HTMLCanvasElement
@@ -207,51 +334,187 @@ export class YoloPoseTracker {
     const srcWidth = 'videoWidth' in sourceEl ? sourceEl.videoWidth || 640 : sourceEl.width || 640;
     const srcHeight = 'videoHeight' in sourceEl ? sourceEl.videoHeight || 480 : sourceEl.height || 480;
 
-    // Draw frame onto 640x640 offscreen canvas
-    this.offscreenCtx.drawImage(sourceEl, 0, 0, 640, 640);
-    const imageData = this.offscreenCtx.getImageData(0, 0, 640, 640);
-    const rgba = imageData.data;
-
-    // If ONNX session is ready, run true YOLOv8-pose inference
-    if (this.session && !this.isUsingFallback) {
-      try {
-        // Build NCHW float32 tensor [1, 3, 640, 640] normalized to [0, 1]
-        const float32Data = new Float32Array(1 * 3 * 640 * 640);
-        const planeSize = 640 * 640;
-
-        for (let i = 0; i < planeSize; i++) {
-          float32Data[i] = rgba[i * 4] / 255.0; // Red plane
-          float32Data[planeSize + i] = rgba[i * 4 + 1] / 255.0; // Green plane
-          float32Data[planeSize * 2 + i] = rgba[i * 4 + 2] / 255.0; // Blue plane
-        }
-
-        const inputTensor = new ort.Tensor('float32', float32Data, [1, 3, 640, 640]);
-        const inputName = this.session.inputNames[0] || 'images';
-        const feeds: Record<string, ort.Tensor> = {};
-        feeds[inputName] = inputTensor;
-
-        const output = await this.session.run(feeds);
-        const outputName = this.session.outputNames[0] || 'output0';
-        const outputData = output[outputName].data as Float32Array;
-
-        return this.postprocessYoloOutput(outputData, srcWidth, srcHeight);
-      } catch (err) {
-        console.warn('[YOLOv8-pose] ONNX run error, switching to vision tracker:', err);
-        this.isUsingFallback = true;
-      }
+    // Use MediaPipe if available (better for iframe, runs on GPU)
+    if (this.useMediaPipe && this.mpPose && 'videoWidth' in sourceEl) {
+      return this.detectWithMediaPipe(sourceEl as HTMLVideoElement, srcWidth, srcHeight);
     }
 
-    // High-performance real-time vision pose fallback
-    return this.detectPeopleViaVision(rgba, srcWidth, srcHeight);
+    // ONNX path with proper letterboxing (preserves aspect ratio)
+    if (this.session && this.isUsingONNX) {
+      return this.detectWithONNX(sourceEl, srcWidth, srcHeight);
+    }
+
+    // No valid detector available - return empty (NO fake keypoints!)
+    console.warn('[YOLOv8-pose] No pose detector available');
+    return [];
+  }
+
+  /**
+   * MediaPipe detection - preserves aspect ratio, runs on GPU
+   */
+  private async detectWithMediaPipe(
+    video: HTMLVideoElement,
+    srcWidth: number,
+    srcHeight: number
+  ): Promise<YoloPersonDetection[]> {
+    if (!this.mpPose) return [];
+
+    try {
+      const timestamp = performance.now();
+      const mpResult = this.mpPose.detectForVideo(video, timestamp);
+      
+      if (!mpResult.landmarks || mpResult.landmarks.length === 0) {
+        this.previousDetectionsMap.clear();
+        return [];
+      }
+
+      const detections: YoloPersonDetection[] = mpResult.landmarks.map((landmarks: any[], idx: number) => {
+        // MediaPipe returns 33 landmarks, we need COCO 17
+        const cocoKeypoints = this.convertMediaPipeToCOCO(landmarks, srcWidth, srcHeight);
+        
+        // Calculate bbox from landmarks
+        let minX = 1, minY = 1, maxX = 0, maxY = 0;
+        for (const kp of cocoKeypoints) {
+          if (kp.confidence > 0.3) {
+            minX = Math.min(minX, kp.x);
+            minY = Math.min(minY, kp.y);
+            maxX = Math.max(maxX, kp.x);
+            maxY = Math.max(maxY, kp.y);
+          }
+        }
+        
+        const padding = 0.1;
+        const bbox = {
+          x: Math.max(0, minX - padding),
+          y: Math.max(0, minY - padding),
+          width: Math.min(1, maxX - minX + padding * 2),
+          height: Math.min(1, maxY - minY + padding * 2),
+        };
+
+        const prev = this.previousDetectionsMap.get(idx + 1);
+        let motionVelocity = 0;
+        if (prev && prev.keypoints.length === 17) {
+          let diffSum = 0, count = 0;
+          for (let k = 0; k < 17; k++) {
+            const kp = cocoKeypoints[k];
+            const pkp = prev.keypoints[k];
+            if (kp.confidence > 0.25 && pkp.confidence > 0.25) {
+              diffSum += Math.hypot(kp.x - pkp.x, kp.y - pkp.y);
+              count++;
+            }
+          }
+          if (count > 0) motionVelocity = diffSum / count;
+        }
+
+        const detection: YoloPersonDetection = {
+          id: idx + 1,
+          bbox,
+          score: 0.9,
+          keypoints: cocoKeypoints,
+          label: `Dancer #${idx + 1} (90%)`,
+          motionVelocity,
+        };
+
+        this.previousDetectionsMap.set(idx + 1, detection);
+        return detection;
+      });
+
+      // Sort left to right for consistent mapping
+      detections.sort((a, b) => a.bbox.x - b.bbox.x);
+      return detections;
+    } catch (err) {
+      console.error('[MediaPipe] Detection error:', err);
+      return [];
+    }
+  }
+
+  /**
+   * Convert MediaPipe 33 landmarks to COCO 17 format
+   */
+  private convertMediaPipeToCOCO(landmarks: any[], srcWidth: number, srcHeight: number): YoloKeypoint[] {
+    // MediaPipe pose landmark indices mapping to COCO
+    // MP: 0=nose, 2=left_eye_inner, 5=right_eye_inner, 7=left_ear, 8=right_ear
+    //     11=left_shoulder, 12=right_shoulder, 13=left_elbow, 14=right_elbow
+    //     15=left_wrist, 16=right_wrist, 23=left_hip, 24=right_hip
+    //     25=left_knee, 26=right_knee, 27=left_ankle, 28=right_ankle
+    
+    const mpToCoco = [0, 2, 5, 7, 8, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
+    
+    return mpToCoco.map((mpIdx, i) => {
+      const lm = landmarks[mpIdx];
+      if (!lm) return { x: 0, y: 0, confidence: 0 };
+      return {
+        x: lm.x,
+        y: lm.y,
+        confidence: lm.visibility ?? lm.presence ?? 0.5,
+      };
+    });
+  }
+
+  /**
+   * ONNX detection with proper letterboxing (preserves aspect ratio)
+   */
+  private async detectWithONNX(
+    sourceEl: HTMLVideoElement | HTMLCanvasElement,
+    srcWidth: number,
+    srcHeight: number
+  ): Promise<YoloPersonDetection[]> {
+    if (!this.offscreenCtx || !this.session) return [];
+
+    // Calculate letterbox dimensions to preserve aspect ratio
+    const scale = Math.min(this.offscreenWidth / srcWidth, this.offscreenHeight / srcHeight);
+    const drawWidth = srcWidth * scale;
+    const drawHeight = srcHeight * scale;
+    const offsetX = (this.offscreenWidth - drawWidth) / 2;
+    const offsetY = (this.offscreenHeight - drawHeight) / 2;
+
+    // Clear and draw with letterboxing
+    this.offscreenCtx.fillStyle = '#000000';
+    this.offscreenCtx.fillRect(0, 0, this.offscreenWidth, this.offscreenHeight);
+    this.offscreenCtx.drawImage(sourceEl, offsetX, offsetY, drawWidth, drawHeight);
+    
+    const imageData = this.offscreenCtx.getImageData(0, 0, this.offscreenWidth, this.offscreenHeight);
+    const rgba = imageData.data;
+
+    try {
+      // Build NCHW float32 tensor [1, 3, 640, 640] normalized to [0, 1]
+      const float32Data = new Float32Array(1 * 3 * 640 * 640);
+      const planeSize = 640 * 640;
+
+      for (let i = 0; i < planeSize; i++) {
+        float32Data[i] = rgba[i * 4] / 255.0; // Red plane
+        float32Data[planeSize + i] = rgba[i * 4 + 1] / 255.0; // Green plane
+        float32Data[planeSize * 2 + i] = rgba[i * 4 + 2] / 255.0; // Blue plane
+      }
+
+      const inputTensor = new ort.Tensor('float32', float32Data, [1, 3, 640, 640]);
+      const inputName = this.session.inputNames[0] || 'images';
+      const feeds: Record<string, ort.Tensor> = { [inputName]: inputTensor };
+
+      const output = await this.session.run(feeds);
+      const outputName = this.session.outputNames[0] || 'output0';
+      const outputData = output[outputName].data as Float32Array;
+
+      // Need to map detections back from letterboxed coords to original
+      return this.postprocessYoloOutput(outputData, srcWidth, srcHeight, scale, offsetX, offsetY);
+    } catch (err) {
+      console.warn('[YOLOv8-pose] ONNX run error:', err);
+      this.isUsingONNX = false;
+      return [];
+    }
   }
 
   /**
    * Postprocess raw YOLOv8-pose output tensor [1, 56, 8400] with NMS
+   * Now handles letterbox coordinate mapping
    */
   private postprocessYoloOutput(
     data: Float32Array,
     srcWidth: number,
-    srcHeight: number
+    srcHeight: number,
+    scale: number = 1,
+    offsetX: number = 0,
+    offsetY: number = 0
   ): YoloPersonDetection[] {
     const numAnchors = 8400;
     const candidates: Array<{
@@ -261,29 +524,39 @@ export class YoloPoseTracker {
     }> = [];
 
     for (let a = 0; a < numAnchors; a++) {
-      // Channel 4 is the person score
       const score = data[4 * numAnchors + a];
       if (score > this.confidenceThreshold) {
-        // Channel 0, 1, 2, 3: center_x, center_y, width, height (in 640x640 space)
+        // Coordinates are in 640x640 letterboxed space
         const cx = data[0 * numAnchors + a] / 640;
         const cy = data[1 * numAnchors + a] / 640;
         const w = data[2 * numAnchors + a] / 640;
         const h = data[3 * numAnchors + a] / 640;
 
-        const x = Math.max(0, cx - w / 2);
-        const y = Math.max(0, cy - h / 2);
+        // Map from letterboxed coordinates back to original image coordinates
+        let x = (cx - w / 2 - offsetX / 640) / scale;
+        let y = (cy - h / 2 - offsetY / 640) / scale;
+        x = Math.max(0, Math.min(1, x));
+        y = Math.max(0, Math.min(1, y));
+        const normW = Math.max(0, Math.min(1, w / scale));
+        const normH = Math.max(0, Math.min(1, h / scale));
 
-        // Extract 17 keypoints (channels 5..55)
         const keypoints: YoloKeypoint[] = [];
         for (let k = 0; k < 17; k++) {
           const kx = data[(5 + k * 3) * numAnchors + a] / 640;
           const ky = data[(5 + k * 3 + 1) * numAnchors + a] / 640;
           const kconf = data[(5 + k * 3 + 2) * numAnchors + a];
-          keypoints.push({ x: kx, y: ky, confidence: kconf });
+          
+          // Map keypoints from letterboxed space
+          let mkx = (kx - offsetX / 640) / scale;
+          let mky = (ky - offsetY / 640) / scale;
+          mkx = Math.max(0, Math.min(1, mkx));
+          mky = Math.max(0, Math.min(1, mky));
+          
+          keypoints.push({ x: mkx, y: mky, confidence: kconf });
         }
 
         candidates.push({
-          box: { x, y, width: w, height: h },
+          box: { x, y, width: normW, height: normH },
           score,
           keypoints,
         });
@@ -292,19 +565,16 @@ export class YoloPoseTracker {
 
     if (candidates.length === 0) {
       this.previousDetectionsMap.clear();
-      return []; // Real result: ZERO people detected!
+      return [];
     }
 
-    // Sort candidate boxes by score descending
     candidates.sort((a, b) => b.score - a.score);
 
-    // Apply Non-Maximum Suppression (NMS)
     const picked: typeof candidates = [];
     const maxPersons = 5;
 
     for (const cand of candidates) {
       if (picked.length >= maxPersons) break;
-
       let keep = true;
       for (const p of picked) {
         if (this.calculateIoU(cand.box, p.box) > this.iouThreshold) {
@@ -312,13 +582,9 @@ export class YoloPoseTracker {
           break;
         }
       }
-
-      if (keep) {
-        picked.push(cand);
-      }
+      if (keep) picked.push(cand);
     }
 
-    // Sort picked persons from Left to Right (x coordinate) for consistent P1..P5 mapping
     picked.sort((a, b) => a.box.x - b.box.x);
 
     return picked.map((item, idx) => {
@@ -327,8 +593,7 @@ export class YoloPoseTracker {
       let motionVelocity = 0;
 
       if (prev && prev.keypoints && prev.keypoints.length === 17) {
-        let diffSum = 0;
-        let count = 0;
+        let diffSum = 0, count = 0;
         for (let k = 0; k < 17; k++) {
           const kp = item.keypoints[k];
           const pkp = prev.keypoints[k];
@@ -337,9 +602,7 @@ export class YoloPoseTracker {
             count++;
           }
         }
-        if (count > 0) {
-          motionVelocity = diffSum / count;
-        }
+        if (count > 0) motionVelocity = diffSum / count;
       }
 
       const res: YoloPersonDetection = {
@@ -357,172 +620,7 @@ export class YoloPoseTracker {
   }
 
   /**
-   * Real-time vision-based pose tracker fallback.
-   * Accurately checks whether a person is actually in the frame (if empty or stepped away, returns []).
-   * Accurately tracks head, torso, arm gestures (raised hands, clapping, side swings) and motion velocity.
-   */
-  private detectPeopleViaVision(
-    rgba: Uint8ClampedArray,
-    _srcWidth: number,
-    _srcHeight: number
-  ): YoloPersonDetection[] {
-    const w = 640;
-    const h = 640;
-
-    if (!this.prevFrameData || this.prevFrameData.length !== rgba.length) {
-      this.prevFrameData = new Uint8ClampedArray(rgba);
-      return [];
-    }
-
-    let diffCount = 0;
-    let personPixels = 0;
-    let minX = w, maxX = 0, minY = h, maxY = 0;
-
-    // Fast sampling grid (step 6 for ultra-smooth 60fps performance)
-    const step = 6;
-    for (let y = 0; y < h; y += step) {
-      for (let x = 0; x < w; x += step) {
-        const idx = (y * w + x) * 4;
-        const r = rgba[idx];
-        const g = rgba[idx + 1];
-        const b = rgba[idx + 2];
-
-        const pr = this.prevFrameData[idx];
-        const pg = this.prevFrameData[idx + 1];
-        const pb = this.prevFrameData[idx + 2];
-
-        const diff = Math.abs(r - pr) + Math.abs(g - pg) + Math.abs(b - pb);
-        if (diff > 28) {
-          diffCount++;
-          personPixels++;
-          if (x < minX) minX = x;
-          if (x > maxX) maxX = x;
-          if (y < minY) minY = y;
-          if (y > maxY) maxY = y;
-        } else {
-          // Subtle silhouette check
-          const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-          if (lum > 40 && lum < 225) {
-            personPixels++;
-          }
-        }
-      }
-    }
-
-    // Update reference frame
-    this.prevFrameData.set(rgba);
-
-    const sampledCount = (w / step) * (h / step);
-    const motionVelocity = diffCount / (sampledCount * 0.15);
-
-    // If completely blocked or empty camera
-    if (personPixels < 400) {
-      return []; // Truly no dancer in frame!
-    }
-
-    // Default to dynamic box based on active motion or reasonable dancer frame
-    let normX = 0.25;
-    let normY = 0.10;
-    let normW = 0.50;
-    let normH = 0.80;
-
-    if (diffCount > 20 && maxX > minX && maxY > minY) {
-      normX = Math.max(0.05, Math.min(0.85, (minX - 20) / w));
-      normY = Math.max(0.05, Math.min(0.85, (minY - 15) / h));
-      normW = Math.max(0.20, Math.min(0.70, (maxX - minX + 40) / w));
-      normH = Math.max(0.35, Math.min(0.85, (maxY - minY + 30) / h));
-    }
-
-    const cx = normX + normW / 2;
-    const topY = normY;
-    const botY = normY + normH;
-
-    // Detect arm elevation by checking differences in upper left and upper right regions
-    let leftUpperMotion = 0;
-    let rightUpperMotion = 0;
-    const midX = Math.floor(w / 2);
-    const upperY = Math.floor(h * 0.5);
-
-    for (let y = 0; y < upperY; y += step * 2) {
-      for (let x = 0; x < w; x += step * 2) {
-        const idx = (y * w + x) * 4;
-        const diff = Math.abs(rgba[idx] - this.prevFrameData[idx]);
-        if (diff > 25) {
-          if (x < midX) leftUpperMotion++;
-          else rightUpperMotion++;
-        }
-      }
-    }
-
-    const isLeftHigh = leftUpperMotion > 12;
-    const isRightHigh = rightUpperMotion > 12;
-
-    const shoulderY = topY + normH * 0.22;
-    const lsX = cx - normW * 0.28;
-    const rsX = cx + normW * 0.28;
-
-    const lwX = isLeftHigh ? cx - normW * 0.42 : cx - normW * 0.25;
-    const lwY = isLeftHigh ? topY + normH * 0.05 : shoulderY + normH * 0.28;
-
-    const rwX = isRightHigh ? cx + normW * 0.42 : cx + normW * 0.25;
-    const rwY = isRightHigh ? topY + normH * 0.05 : shoulderY + normH * 0.28;
-
-    const leX = (lsX + lwX) / 2 - 0.02;
-    const leY = (shoulderY + lwY) / 2;
-    const reX = (rsX + rwX) / 2 + 0.02;
-    const reY = (shoulderY + rwY) / 2;
-
-    const hipY = topY + normH * 0.55;
-    const lhX = cx - normW * 0.18;
-    const rhX = cx + normW * 0.18;
-
-    const lkX = lhX;
-    const lkY = topY + normH * 0.76;
-    const rkX = rhX;
-    const rkY = topY + normH * 0.76;
-
-    const laX = lkX;
-    const laY = botY;
-    const raX = rkX;
-    const raY = botY;
-
-    const keypoints: YoloKeypoint[] = [
-      { x: cx, y: topY + normH * 0.08, confidence: 0.92 }, // 0: nose
-      { x: cx - 0.02, y: topY + normH * 0.06, confidence: 0.90 }, // 1: left_eye
-      { x: cx + 0.02, y: topY + normH * 0.06, confidence: 0.90 }, // 2: right_eye
-      { x: cx - 0.04, y: topY + normH * 0.08, confidence: 0.88 }, // 3: left_ear
-      { x: cx + 0.04, y: topY + normH * 0.08, confidence: 0.88 }, // 4: right_ear
-      { x: lsX, y: shoulderY, confidence: 0.95 }, // 5: left_shoulder
-      { x: rsX, y: shoulderY, confidence: 0.95 }, // 6: right_shoulder
-      { x: leX, y: leY, confidence: 0.90 }, // 7: left_elbow
-      { x: reX, y: reY, confidence: 0.90 }, // 8: right_elbow
-      { x: lwX, y: lwY, confidence: 0.92 }, // 9: left_wrist
-      { x: rwX, y: rwY, confidence: 0.92 }, // 10: right_wrist
-      { x: lhX, y: hipY, confidence: 0.94 }, // 11: left_hip
-      { x: rhX, y: hipY, confidence: 0.94 }, // 12: right_hip
-      { x: lkX, y: lkY, confidence: 0.90 }, // 13: left_knee
-      { x: rkX, y: rkY, confidence: 0.90 }, // 14: right_knee
-      { x: laX, y: laY, confidence: 0.88 }, // 15: left_ankle
-      { x: raX, y: raY, confidence: 0.88 }, // 16: right_ankle
-    ];
-
-    const detection: YoloPersonDetection = {
-      id: 1,
-      bbox: { x: normX, y: normY, width: normW, height: normH },
-      score: 0.95,
-      keypoints,
-      label: 'Dancer #1 (95%)',
-      motionVelocity,
-    };
-
-    this.previousDetectionsMap.set(1, detection);
-    return [detection];
-  }
-
-  /**
-   * Render compact Kinect-style dancer silhouette HUD matching Just Dance Kinect UI
-   * As shown in Screenshot_20261031-035647.png:
-   * Neat unobtrusive card with glowing neon green dancer skeleton mirroring the player's pose live!
+   * Render compact Kinect-style dancer silhouette HUD
    */
   public renderKinectSkeleton(
     person: YoloPersonDetection | null,
@@ -533,11 +631,9 @@ export class YoloPoseTracker {
   ) {
     ctx.clearRect(0, 0, width, height);
 
-    // Subtle dark glass background
     ctx.fillStyle = 'rgba(8, 12, 24, 0.70)';
     ctx.fillRect(0, 0, width, height);
 
-    // Glowing subtle outer border
     ctx.strokeStyle = colorHex;
     ctx.lineWidth = 1.5;
     ctx.shadowColor = colorHex;
@@ -546,9 +642,8 @@ export class YoloPoseTracker {
     ctx.shadowBlur = 0;
 
     if (!person || !person.keypoints || person.keypoints.length < 17) {
-      // Unobtrusive "Step In" placeholder
       ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-      ctx.font = 'bold 9px Montserrat, sans-serif';
+      ctx.font = 'bold 9px system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('STEP IN VIEW', width / 2, height / 2 + 3);
       return;
@@ -558,7 +653,6 @@ export class YoloPoseTracker {
     const scaleX = width;
     const scaleY = height;
 
-    // Draw glowing bone links
     ctx.lineWidth = 3;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -577,7 +671,6 @@ export class YoloPoseTracker {
       }
     }
 
-    // Draw head / nose disc
     const nose = kps[0];
     if (nose && nose.confidence > 0.25) {
       ctx.fillStyle = colorHex;
@@ -586,7 +679,6 @@ export class YoloPoseTracker {
       ctx.fill();
     }
 
-    // Draw glowing joint circles
     ctx.fillStyle = '#ffffff';
     for (let i = 5; i < 17; i++) {
       const kp = kps[i];
@@ -641,23 +733,20 @@ export class YoloPoseTracker {
       const bh = person.bbox.height * height;
 
       if (this.showYoloDebugOverlay) {
-        // Draw YOLO Bounding Box
         ctx.strokeStyle = color;
         ctx.lineWidth = 2.5;
         ctx.setLineDash([6, 3]);
         ctx.strokeRect(bx, by, bw, bh);
         ctx.setLineDash([]);
 
-        // Label Tag
         const tagText = `COACH/DANCER #${person.id} (${Math.round(person.score * 100)}%)`;
         ctx.fillStyle = color;
         ctx.fillRect(bx, Math.max(0, by - 22), 170, 22);
         ctx.fillStyle = '#000000';
-        ctx.font = 'bold 10px Montserrat, sans-serif';
+        ctx.font = 'bold 10px system-ui, sans-serif';
         ctx.fillText(tagText, bx + 5, Math.max(14, by - 7));
       }
 
-      // Draw 17 COCO Keypoint Skeleton Lines
       const kps = person.keypoints;
       COCO_POSE_CONNECTIONS.forEach(([i1, i2]) => {
         const kp1 = kps[i1];
@@ -672,7 +761,6 @@ export class YoloPoseTracker {
         }
       });
 
-      // Draw Keypoint Joint Dots
       kps.forEach((kp) => {
         if (kp.confidence > 0.3) {
           ctx.beginPath();
@@ -705,7 +793,6 @@ export class YoloPoseTracker {
     ctx.save();
     ctx.globalAlpha = alpha;
 
-    // Draw 17 COCO Keypoint Skeleton Lines
     COCO_POSE_CONNECTIONS.forEach(([i1, i2]) => {
       const kp1 = keypoints[i1];
       const kp2 = keypoints[i2];
@@ -721,7 +808,6 @@ export class YoloPoseTracker {
       }
     });
 
-    // Draw Joint Dots
     keypoints.forEach((kp) => {
       if (kp.confidence > 0.2) {
         ctx.beginPath();
@@ -764,19 +850,17 @@ export class YoloPoseTracker {
       };
     }
 
-    // If dancer is standing completely motionless, register MISS
     if (motionVelocity !== undefined && motionVelocity < 0.007) {
       return {
         feedback: 'MISS',
         scorePoints: 0,
         similarityPercentage: 5,
         detectedPose: 'STATIC',
-        motionVelocity: motionVelocity,
+        motionVelocity,
         statusTip: 'Standing still! Follow and dance with the coach movement!',
       };
     }
 
-    // Verify keypoint count with confidence > 0.3 (ensure person is actually visible)
     const validKeypoints = playerKeypoints.filter((k) => k.confidence > 0.3);
     if (validKeypoints.length < 5) {
       return {
@@ -789,7 +873,6 @@ export class YoloPoseTracker {
       };
     }
 
-    // Compute Object Keypoint Similarity (OKS)
     let totalScoreSum = 0;
     let matchCount = 0;
 
@@ -810,70 +893,25 @@ export class YoloPoseTracker {
     const similarityPercentage = Math.round(similarityRatio * 100);
 
     if (similarityPercentage >= 80) {
-      return {
-        feedback: 'PERFECT',
-        scorePoints: 90,
-        similarityPercentage,
-        detectedPose: 'RAISE_HANDS',
-        motionVelocity: motionVelocity ?? 0.4,
-        statusTip: `UNLIMITED ACCURACY: ${similarityPercentage}%! PERFECT coach mirror!`,
-      };
+      return { feedback: 'PERFECT', scorePoints: 90, similarityPercentage, detectedPose: 'RAISE_HANDS', motionVelocity: motionVelocity ?? 0.4, statusTip: `UNLIMITED ACCURACY: ${similarityPercentage}%! PERFECT coach mirror!` };
     } else if (similarityPercentage >= 65) {
-      return {
-        feedback: 'SUPER',
-        scorePoints: 70,
-        similarityPercentage,
-        detectedPose: 'RAISE_HANDS',
-        motionVelocity: motionVelocity ?? 0.3,
-        statusTip: `UNLIMITED ACCURACY: ${similarityPercentage}%! GREAT posture!`,
-      };
+      return { feedback: 'SUPER', scorePoints: 70, similarityPercentage, detectedPose: 'RAISE_HANDS', motionVelocity: motionVelocity ?? 0.3, statusTip: `UNLIMITED ACCURACY: ${similarityPercentage}%! GREAT posture!` };
     } else if (similarityPercentage >= 45) {
-      return {
-        feedback: 'GOOD',
-        scorePoints: 45,
-        similarityPercentage,
-        detectedPose: 'SIDE_STEP',
-        motionVelocity: motionVelocity ?? 0.2,
-        statusTip: `UNLIMITED ACCURACY: ${similarityPercentage}%! Follow coach movements!`,
-      };
+      return { feedback: 'GOOD', scorePoints: 45, similarityPercentage, detectedPose: 'SIDE_STEP', motionVelocity: motionVelocity ?? 0.2, statusTip: `UNLIMITED ACCURACY: ${similarityPercentage}%! Follow coach movements!` };
     } else if (similarityPercentage >= 25) {
-      return {
-        feedback: 'OK',
-        scorePoints: 20,
-        similarityPercentage,
-        detectedPose: 'SIDE_STEP',
-        motionVelocity: motionVelocity ?? 0.15,
-        statusTip: `UNLIMITED ACCURACY: ${similarityPercentage}%. Align arms closer to coach.`,
-      };
+      return { feedback: 'OK', scorePoints: 20, similarityPercentage, detectedPose: 'SIDE_STEP', motionVelocity: motionVelocity ?? 0.15, statusTip: `UNLIMITED ACCURACY: ${similarityPercentage}%. Align arms closer to coach.` };
     }
 
-    return {
-      feedback: 'MISS',
-      scorePoints: 0,
-      similarityPercentage,
-      detectedPose: 'STATIC',
-      motionVelocity: motionVelocity ?? 0.05,
-      statusTip: 'UNLIMITED ACCURACY: Below 25%. Follow the coach routine on screen!',
-    };
+    return { feedback: 'MISS', scorePoints: 0, similarityPercentage, detectedPose: 'STATIC', motionVelocity: motionVelocity ?? 0.05, statusTip: 'UNLIMITED ACCURACY: Below 25%. Follow the coach routine on screen!' };
   }
 
-  /**
-   * Evaluate standard Just Dance pictograms against player's 17 keypoints and motion velocity
-   */
   public evaluateStandardPictogramPose(
     person: YoloPersonDetection,
     targetPose: TargetPoseType
   ): YoloEvaluationResult {
     const kps = person.keypoints;
     if (!kps || kps.length < 17) {
-      return {
-        feedback: 'MISS',
-        scorePoints: 0,
-        similarityPercentage: 0,
-        detectedPose: 'NO_BODY',
-        motionVelocity: 0,
-        statusTip: 'Step in front of camera so your full body is visible!',
-      };
+      return { feedback: 'MISS', scorePoints: 0, similarityPercentage: 0, detectedPose: 'NO_BODY', motionVelocity: 0, statusTip: 'Step in front of camera so your full body is visible!' };
     }
 
     const motion = person.motionVelocity || 0;
@@ -885,16 +923,8 @@ export class YoloPoseTracker {
     const lh = kps[11];
     const rh = kps[12];
 
-    // Check if dancer is standing completely motionless (cheating / static)
     if (motion < 0.007) {
-      return {
-        feedback: 'MISS',
-        scorePoints: 0,
-        similarityPercentage: 10,
-        detectedPose: 'STATIC',
-        motionVelocity: motion,
-        statusTip: 'You are standing still! Groove and move with the music!',
-      };
+      return { feedback: 'MISS', scorePoints: 0, similarityPercentage: 10, detectedPose: 'STATIC', motionVelocity: motion, statusTip: 'You are standing still! Groove and move with the music!' };
     }
 
     const shouldersMidY = (ls.y + rs.y) / 2;
@@ -911,145 +941,43 @@ export class YoloPoseTracker {
     switch (targetPose) {
       case 'RAISE_HANDS':
       case 'JUMP_WAVE':
-        if (bothHandsAboveNose && motion >= 0.015) {
-          matchQuality = 'PERFECT';
-          pts = 90;
-          sim = 95;
-          poseStatus = 'PERFECT! Hands raised high in the air!';
-        } else if (bothHandsAboveShoulders) {
-          matchQuality = 'SUPER';
-          pts = 70;
-          sim = 82;
-          poseStatus = 'SUPER! Great arm elevation!';
-        } else if (oneHandHigh) {
-          matchQuality = 'GOOD';
-          pts = 45;
-          sim = 65;
-          poseStatus = 'GOOD! Raise both arms higher!';
-        } else {
-          matchQuality = 'OK';
-          pts = 20;
-          sim = 40;
-          poseStatus = 'OK! Follow the Raise Hands pictogram!';
-        }
+        if (bothHandsAboveNose && motion >= 0.015) { matchQuality = 'PERFECT'; pts = 90; sim = 95; poseStatus = 'PERFECT! Hands raised high in the air!'; }
+        else if (bothHandsAboveShoulders) { matchQuality = 'SUPER'; pts = 70; sim = 82; poseStatus = 'SUPER! Great arm elevation!'; }
+        else if (oneHandHigh) { matchQuality = 'GOOD'; pts = 45; sim = 65; poseStatus = 'GOOD! Raise both arms higher!'; }
+        else { matchQuality = 'OK'; pts = 20; sim = 40; poseStatus = 'OK! Follow the Raise Hands pictogram!'; }
         break;
-
       case 'CLAP_NOW':
-        if (wristDist < 0.20 && motion >= 0.012) {
-          matchQuality = 'PERFECT';
-          pts = 90;
-          sim = 95;
-          poseStatus = 'PERFECT! Fast energetic clap on beat!';
-        } else if (wristDist < 0.32) {
-          matchQuality = 'SUPER';
-          pts = 70;
-          sim = 80;
-          poseStatus = 'SUPER! Bring hands together to clap!';
-        } else {
-          matchQuality = 'OK';
-          pts = 20;
-          sim = 45;
-          poseStatus = 'OK! Clap your hands together!';
-        }
+        if (wristDist < 0.20 && motion >= 0.012) { matchQuality = 'PERFECT'; pts = 90; sim = 95; poseStatus = 'PERFECT! Fast energetic clap on beat!'; }
+        else if (wristDist < 0.32) { matchQuality = 'SUPER'; pts = 70; sim = 80; poseStatus = 'SUPER! Bring hands together to clap!'; }
+        else { matchQuality = 'OK'; pts = 20; sim = 45; poseStatus = 'OK! Clap your hands together!'; }
         break;
-
       case 'DISCO_POINT':
-        if (oneHandHigh && (lw.y > shouldersMidY || rw.y > shouldersMidY)) {
-          matchQuality = 'PERFECT';
-          pts = 90;
-          sim = 92;
-          poseStatus = 'PERFECT! Disco finger pointed up high!';
-        } else if (oneHandHigh) {
-          matchQuality = 'SUPER';
-          pts = 70;
-          sim = 78;
-          poseStatus = 'SUPER! Nice disco point!';
-        } else {
-          matchQuality = 'GOOD';
-          pts = 45;
-          sim = 60;
-          poseStatus = 'GOOD! Point high diagonally to the sky!';
-        }
+        if (oneHandHigh && (lw.y > shouldersMidY || rw.y > shouldersMidY)) { matchQuality = 'PERFECT'; pts = 90; sim = 92; poseStatus = 'PERFECT! Disco finger pointed up high!'; }
+        else if (oneHandHigh) { matchQuality = 'SUPER'; pts = 70; sim = 78; poseStatus = 'SUPER! Nice disco point!'; }
+        else { matchQuality = 'GOOD'; pts = 45; sim = 60; poseStatus = 'GOOD! Point high diagonally to the sky!'; }
         break;
-
-      case 'SIDE_STEP':
-      case 'HIP_SHAKE':
-      case 'BODY_WAVE':
-        if (motion >= 0.022) {
-          matchQuality = 'PERFECT';
-          pts = 90;
-          sim = 92;
-          poseStatus = 'PERFECT! Great groove & rhythmic motion!';
-        } else if (motion >= 0.012) {
-          matchQuality = 'SUPER';
-          pts = 70;
-          sim = 78;
-          poseStatus = 'SUPER! Keep the body moving with the beat!';
-        } else {
-          matchQuality = 'GOOD';
-          pts = 45;
-          sim = 55;
-          poseStatus = 'GOOD! Step and sway to the side!';
-        }
+      case 'SIDE_STEP': case 'HIP_SHAKE': case 'BODY_WAVE':
+        if (motion >= 0.022) { matchQuality = 'PERFECT'; pts = 90; sim = 92; poseStatus = 'PERFECT! Great groove & rhythmic motion!'; }
+        else if (motion >= 0.012) { matchQuality = 'SUPER'; pts = 70; sim = 78; poseStatus = 'SUPER! Keep the body moving with the beat!'; }
+        else { matchQuality = 'GOOD'; pts = 45; sim = 55; poseStatus = 'GOOD! Step and sway to the side!'; }
         break;
-
       case 'SPIN_AROUND':
-        if (motion >= 0.028) {
-          matchQuality = 'PERFECT';
-          pts = 90;
-          sim = 95;
-          poseStatus = 'PERFECT! Fantastic spin!';
-        } else {
-          matchQuality = 'SUPER';
-          pts = 70;
-          sim = 75;
-          poseStatus = 'SUPER! Keep spinning with the beat!';
-        }
+        if (motion >= 0.028) { matchQuality = 'PERFECT'; pts = 90; sim = 95; poseStatus = 'PERFECT! Fantastic spin!'; }
+        else { matchQuality = 'SUPER'; pts = 70; sim = 75; poseStatus = 'SUPER! Keep spinning with the beat!'; }
         break;
-
       case 'CROSS_ARMS':
-        if (wristDist < 0.28 && lw.y < lh.y && rw.y < rh.y) {
-          matchQuality = 'PERFECT';
-          pts = 90;
-          sim = 90;
-          poseStatus = 'PERFECT! Crisp crossed arms!';
-        } else {
-          matchQuality = 'GOOD';
-          pts = 45;
-          sim = 65;
-          poseStatus = 'GOOD! Cross arms across chest!';
-        }
+        if (wristDist < 0.28 && lw.y < lh.y && rw.y < rh.y) { matchQuality = 'PERFECT'; pts = 90; sim = 90; poseStatus = 'PERFECT! Crisp crossed arms!'; }
+        else { matchQuality = 'GOOD'; pts = 45; sim = 65; poseStatus = 'GOOD! Cross arms across chest!'; }
         break;
-
       default:
-        if (motion >= 0.018) {
-          matchQuality = 'PERFECT';
-          pts = 90;
-          sim = 90;
-          poseStatus = 'PERFECT! Amazing rhythm!';
-        } else {
-          matchQuality = 'GOOD';
-          pts = 45;
-          sim = 60;
-          poseStatus = 'GOOD! Follow the coach!';
-        }
+        if (motion >= 0.018) { matchQuality = 'PERFECT'; pts = 90; sim = 90; poseStatus = 'PERFECT! Amazing rhythm!'; }
+        else { matchQuality = 'GOOD'; pts = 45; sim = 60; poseStatus = 'GOOD! Follow the coach!'; }
         break;
     }
 
-    return {
-      feedback: matchQuality,
-      scorePoints: pts,
-      similarityPercentage: sim,
-      detectedPose: targetPose,
-      motionVelocity: motion,
-      statusTip: poseStatus,
-    };
+    return { feedback: matchQuality, scorePoints: pts, similarityPercentage: sim, detectedPose: targetPose, motionVelocity: motion, statusTip: poseStatus };
   }
 
-  /**
-   * Used by Training Studio:
-   * Analyzes an uploaded coach video frame and extracts all detected coaches (1 to 5)
-   */
   public async analyzeVideoFrameForCoaches(
     video: HTMLVideoElement,
     timestampSeconds: number
@@ -1062,11 +990,7 @@ export class YoloPoseTracker {
       bbox: d.bbox,
     }));
 
-    return {
-      coachCount: Math.max(1, detections.length),
-      coachFrames,
-      detections,
-    };
+    return { coachCount: Math.max(1, detections.length), coachFrames, detections };
   }
 }
 

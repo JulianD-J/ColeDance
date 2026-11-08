@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { soundEngine } from '../../services/soundEffects';
 import { menuMusic } from '../../services/menuMusicService';
+import { clearAllCustomSongs } from '../../data/songsData';
+import { Modal, Button, Badge, Chip, Tooltip, Card, Slider, Switch } from '../ui';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -58,272 +61,314 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     showToast(`Video fit set to ${fit === 'cover' ? 'Fill Screen (Cover)' : 'Aspect Ratio (Contain)'}`);
   };
 
-  const handleClearCache = () => {
+  const handleClearCache = async () => {
     soundEngine.playClick();
     if (confirm('Clear all locally saved dance data, high scores and restore default songs?')) {
-      localStorage.removeItem('coledance_custom_trained_songs_v3');
-      localStorage.removeItem('coledance_deleted_songs_v1');
+      await clearAllCustomSongs();
       if (onResetLibrary) onResetLibrary();
       showToast('Cache cleared! Default library restored.');
     }
   };
 
+  const tabs: { id: 'audio' | 'camera' | 'display' | 'data'; label: string; icon: React.ReactNode }[] = [
+    { id: 'audio', label: 'Audio & SFX', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" /></svg> },
+    { id: 'camera', label: 'Motion Tracking', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg> },
+    { id: 'display', label: 'Display & Video', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8" /><path d="M12 17v4" /></svg> },
+    { id: 'data', label: 'Data & Cache', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" /><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" /></svg> },
+  ];
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 select-none">
-      <div className="max-w-xl w-full bg-[#130b33]/95 border-2 border-pink-500/80 rounded-3xl p-5 sm:p-7 shadow-[0_0_50px_rgba(255,20,147,0.4)] text-white space-y-5">
-        {/* Header */}
-        <div className="flex justify-between items-center pb-3 border-b border-white/10">
-          <div className="flex items-center space-x-2.5">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-pink-500 to-purple-600 flex items-center justify-center text-lg text-white shadow-lg">
-              <i className="fa-solid fa-gear"></i>
-            </div>
-            <div>
-              <h2 className="text-xl sm:text-2xl font-black italic tracking-wide text-white">
-                COLEDANCE SETTINGS
-              </h2>
-              <p className="text-[11px] text-white/60">Configure audio, camera motion, and display</p>
-            </div>
-          </div>
-
-          <button
-            onClick={() => {
-              soundEngine.playClick();
-              onClose();
-            }}
-            className="w-8 h-8 rounded-full bg-white/10 hover:bg-red-600/80 flex items-center justify-center text-white/70 hover:text-white transition cursor-pointer"
-          >
-            ✕
-          </button>
-        </div>
-
+    <Modal
+      isOpen={true}
+      onClose={() => { soundEngine.playClick(); onClose(); }}
+      title="COLEDANCE SETTINGS"
+      description="Configure audio, camera motion, and display"
+      size="lg"
+      variant="form"
+      showCloseButton={true}
+      footer={
+        <Button variant="primary" size="md" onClick={() => { soundEngine.playClick(); onClose(); }} className="shadow-brand-glow">
+          DONE
+        </Button>
+      }
+    >
+      <motion.div
+        className="space-y-5"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
         {/* Tab Navigation */}
-        <div className="flex space-x-1.5 bg-black/50 p-1.5 rounded-2xl border border-white/10 text-xs font-black">
-          {[
-            { id: 'audio', label: 'Audio & SFX', icon: 'fa-volume-high' },
-            { id: 'camera', label: 'Motion Tracking', icon: 'fa-camera' },
-            { id: 'display', label: 'Display & Video', icon: 'fa-tv' },
-            { id: 'data', label: 'Data & Cache', icon: 'fa-database' },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => {
-                soundEngine.playClick();
-                setActiveTab(tab.id as any);
-              }}
-              className={`flex-1 py-2 rounded-xl transition cursor-pointer flex items-center justify-center space-x-1.5 text-[11px] sm:text-xs ${
-                activeTab === tab.id
-                  ? 'bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-lg font-black'
-                  : 'text-white/60 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              <i className={`fa-solid ${tab.icon} text-xs`}></i>
-              <span className="hidden sm:inline">{tab.label}</span>
-            </button>
+        <div className="flex gap-2 bg-surface-1/50 p-1.5 rounded-2xl border border-outline-variant">
+          {tabs.map((tab) => (
+            <Tooltip key={tab.id} content={tab.label} position="bottom">
+              <Button
+                variant={activeTab === tab.id ? 'primary' : 'ghost'}
+                size="sm"
+                fullWidth
+                leadingIcon={tab.icon}
+                onClick={() => { soundEngine.playClick(); setActiveTab(tab.id); }}
+              >
+                {tab.label}
+              </Button>
+            </Tooltip>
           ))}
         </div>
 
+        {/* Toast confirmation message */}
+        <AnimatePresence>
+          {showStatusToast && (
+            <motion.div
+              className="p-3 rounded-xl bg-success-500/20 border border-success-500/30 text-center"
+              initial={{ opacity: 0, y: -10, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: 'auto' }}
+              exit={{ opacity: 0, y: -10, height: 0 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+            >
+              <span className="text-body-small font-black text-success-400">{showStatusToast}</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Tab 1: Audio & SFX */}
-        {activeTab === 'audio' && (
-          <div className="space-y-4 text-xs">
-            {/* Master Mute Toggle */}
-            <div className="flex items-center justify-between p-3 bg-white/5 rounded-2xl border border-white/10">
-              <div>
-                <div className="font-black text-sm text-white">Master Sound & Music</div>
-                <div className="text-[11px] text-white/60">Toggle all background music and sound effects</div>
-              </div>
-              <button
-                onClick={handleMuteToggle}
-                className={`px-4 py-2 rounded-xl font-black text-xs transition cursor-pointer flex items-center space-x-1.5 ${
-                  !isMuted ? 'bg-emerald-500 text-black shadow' : 'bg-red-600 text-white shadow'
-                }`}
-              >
-                <i className={`fa-solid ${!isMuted ? 'fa-volume-high' : 'fa-volume-xmark'}`}></i>
-                <span>{!isMuted ? 'ENABLED' : 'MUTED'}</span>
-              </button>
-            </div>
+        <AnimatePresence mode="wait">
+          {activeTab === 'audio' && (
+            <motion.div
+              key="audio"
+              className="space-y-4"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              {/* Master Mute Toggle */}
+              <Card variant="filled" padding="md" className="flex items-center justify-between gap-4">
+                <div className="flex-1">
+                  <div className="font-black text-body-medium text-white">Master Sound & Music</div>
+                  <div className="text-body-small text-on-surface-variant mt-0.5">Toggle all background music and sound effects</div>
+                </div>
+                <Tooltip content={isMuted ? 'Unmute all audio' : 'Mute all audio'} position="left">
+                  <Button
+                    variant={!isMuted ? 'success' : 'danger'}
+                    size="md"
+                    leadingIcon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">{!isMuted ? (
+                      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                    ) : (
+                      <>
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                        <line x1="23" y1="9" x2="17" y2="15" />
+                        <line x1="17" y1="9" x2="23" y2="15" />
+                      </>
+                    )}</svg>}
+                    onClick={handleMuteToggle}
+                  >
+                    {!isMuted ? 'ENABLED' : 'MUTED'}
+                  </Button>
+                </Tooltip>
+              </Card>
 
-            {/* Music Volume Slider */}
-            <div className="space-y-1.5 p-3 bg-white/5 rounded-2xl border border-white/10">
-              <div className="flex justify-between items-center font-bold">
-                <span>Menu & Song Music Volume</span>
-                <span className="text-pink-400 font-black">{Math.round(musicVol * 100)}%</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.05"
-                value={musicVol}
-                onChange={(e) => handleMusicChange(parseFloat(e.target.value))}
-                className="w-full accent-pink-500 cursor-pointer"
-              />
-            </div>
+              {/* Music Volume Slider */}
+              <Card variant="filled" padding="md">
+                <div className="flex justify-between items-center font-black text-body-small mb-2">
+                  <span>Menu & Song Music Volume</span>
+                  <span className="text-brand-400 tabular-nums">{Math.round(musicVol * 100)}%</span>
+                </div>
+                <Slider
+                  value={musicVol * 100}
+                  onChange={(v) => handleMusicChange((Array.isArray(v) ? v[0] : v) / 100)}
+                  min={0}
+                  max={100}
+                  step={5}
+                  showValue={false}
+                />
+              </Card>
 
-            {/* SFX Volume Slider */}
-            <div className="space-y-1.5 p-3 bg-white/5 rounded-2xl border border-white/10">
-              <div className="flex justify-between items-center font-bold">
-                <span>Sound Effects (Clicks, Perfect Chimes, Buzzers)</span>
-                <span className="text-cyan-400 font-black">{Math.round(sfxVol * 100)}%</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.05"
-                value={sfxVol}
-                onChange={(e) => handleSfxChange(parseFloat(e.target.value))}
-                className="w-full accent-cyan-400 cursor-pointer"
-              />
-            </div>
-          </div>
-        )}
+              {/* SFX Volume Slider */}
+              <Card variant="filled" padding="md">
+                <div className="flex justify-between items-center font-black text-body-small mb-2">
+                  <span>Sound Effects (Clicks, Perfect Chimes, Buzzers)</span>
+                  <span className="text-accent-400 tabular-nums">{Math.round(sfxVol * 100)}%</span>
+                </div>
+                <Slider
+                  value={sfxVol * 100}
+                  onChange={(v) => handleSfxChange((Array.isArray(v) ? v[0] : v) / 100)}
+                  min={0}
+                  max={100}
+                  step={5}
+                  showValue={false}
+                />
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Tab 2: Motion Tracking & Hardware */}
-        {activeTab === 'camera' && (
-          <div className="space-y-4 text-xs">
-            {/* Device Camera Status */}
-            <div className="p-3 bg-white/5 rounded-2xl border border-white/10 flex items-center justify-between">
-              <div>
-                <div className="font-black text-sm text-white flex items-center space-x-1.5">
-                  <i className={`fa-solid ${hasCamera ? 'fa-video text-emerald-400' : 'fa-video-slash text-amber-400'}`}></i>
-                  <span>Camera Hardware Status</span>
+        <AnimatePresence mode="wait">
+          {activeTab === 'camera' && (
+            <motion.div
+              key="camera"
+              className="space-y-4"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              {/* Device Camera Status */}
+              <Card variant="filled" padding="md" className="flex items-center justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 font-black text-body-medium text-white mb-1">
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                      {!hasCamera && <line x1="3" y1="3" x2="21" y2="21" />}
+                      <circle cx="12" cy="13" r="4" />
+                    </svg>
+                    <span>Camera Hardware Status</span>
+                  </div>
+                  <div className="text-body-small text-on-surface-variant">
+                    {hasCamera
+                      ? 'Webcam active for 1-Player YOLO AI Pose Tracking'
+                      : 'No camera hardware found. ColeDance is using Smartphone Controller Sync'}
+                  </div>
                 </div>
-                <div className="text-[11px] text-white/60">
-                  {hasCamera
-                    ? 'Webcam active for 1-Player YOLO AI Pose Tracking'
-                    : 'No camera hardware found. ColeDance is using Smartphone Controller Sync'}
-                </div>
-              </div>
-              <span className={`px-3 py-1 rounded-full text-[10px] font-black ${
-                hasCamera ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40' : 'bg-amber-500/20 text-amber-300 border border-amber-400/40'
-              }`}>
-                {hasCamera ? 'CAMERA DETECTED' : 'PHONE SYNC MODE'}
-              </span>
-            </div>
+                <Badge
+                  variant={hasCamera ? 'success' : 'warning'}
+                  size="md"
+                  dot
+                  dotColor={hasCamera ? 'success' : 'warning'}
+                >
+                  {hasCamera ? 'CAMERA DETECTED' : 'PHONE SYNC MODE'}
+                </Badge>
+              </Card>
 
-            {/* Sensitivity Selection */}
-            <div className="p-3 bg-white/5 rounded-2xl border border-white/10 space-y-2">
-              <div className="font-black text-sm text-white">Pose Evaluation Sensitivity</div>
-              <div className="text-[11px] text-white/60">Adjust how strictly player keypoints are scored against coach trajectories</div>
-              <div className="grid grid-cols-3 gap-2 pt-1">
-                {(['low', 'normal', 'high'] as const).map((lvl) => (
-                  <button
-                    key={lvl}
-                    onClick={() => {
-                      soundEngine.playClick();
-                      setSensitivity(lvl);
-                      showToast(`Sensitivity set to ${lvl.toUpperCase()}`);
-                    }}
-                    className={`py-2 rounded-xl font-black uppercase text-xs transition cursor-pointer ${
-                      sensitivity === lvl
-                        ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/40 font-black'
-                        : 'bg-white/10 text-white/70 hover:bg-white/15'
-                    }`}
-                  >
-                    {lvl}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+              {/* Sensitivity Selection */}
+              <Card variant="filled" padding="md" className="space-y-3">
+                <div>
+                  <div className="font-black text-body-medium text-white mb-1">Pose Evaluation Sensitivity</div>
+                  <div className="text-body-small text-on-surface-variant">Adjust how strictly player keypoints are scored against coach trajectories</div>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['low', 'normal', 'high'] as const).map((lvl) => (
+                    <Tooltip key={lvl} content={`Sensitivity: ${lvl}`} position="top">
+                      <Button
+                        variant={sensitivity === lvl ? 'primary' : 'ghost'}
+                        size="sm"
+                        fullWidth
+                        onClick={() => { soundEngine.playClick(); setSensitivity(lvl); showToast(`Sensitivity set to ${lvl.toUpperCase()}`); }}
+                      >
+                        {lvl.toUpperCase()}
+                      </Button>
+                    </Tooltip>
+                  ))}
+                </div>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Tab 3: Display & Video */}
-        {activeTab === 'display' && (
-          <div className="space-y-4 text-xs">
-            {/* Video Stretch Mode */}
-            <div className="p-3 bg-white/5 rounded-2xl border border-white/10 space-y-2">
-              <div className="font-black text-sm text-white">Video Screen Scaling</div>
-              <div className="text-[11px] text-white/60">Choose how routine videos fill the dancing screen</div>
-              <div className="grid grid-cols-2 gap-2 pt-1">
-                <button
-                  onClick={() => handleVideoFitChange('cover')}
-                  className={`py-2.5 px-3 rounded-xl font-black text-xs transition cursor-pointer flex items-center justify-center space-x-2 ${
-                    videoFit === 'cover'
-                      ? 'bg-gradient-to-r from-pink-500 to-rose-600 text-white shadow-lg'
-                      : 'bg-white/10 text-white/70 hover:bg-white/15'
-                  }`}
-                >
-                  <i className="fa-solid fa-expand"></i>
-                  <span>FILL SCREEN (COVER)</span>
-                </button>
+        <AnimatePresence mode="wait">
+          {activeTab === 'display' && (
+            <motion.div
+              key="display"
+              className="space-y-4"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              {/* Video Stretch Mode */}
+              <Card variant="filled" padding="md" className="space-y-3">
+                <div>
+                  <div className="font-black text-body-medium text-white mb-1">Video Screen Scaling</div>
+                  <div className="text-body-small text-on-surface-variant">Choose how routine videos fill the dancing screen</div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Tooltip content="Fill screen, may crop edges" position="top">
+                    <Button
+                      variant={videoFit === 'cover' ? 'primary' : 'ghost'}
+                      size="md"
+                      fullWidth
+                      leadingIcon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3H5a2 2 0 0 0-2 2v3" /><path d="M21 8V5a2 2 0 0 0-2-2h-3" /><path d="M3 16v3a2 2 0 0 0 2 2h3" /><path d="M16 21h3a2 2 0 0 0 2-2v-3" /></svg>}
+                      onClick={() => handleVideoFitChange('cover')}
+                    >
+                      FILL SCREEN (COVER)
+                    </Button>
+                  </Tooltip>
+                  <Tooltip content="Preserve aspect ratio, may show bars" position="top">
+                    <Button
+                      variant={videoFit === 'contain' ? 'primary' : 'ghost'}
+                      size="md"
+                      fullWidth
+                      leadingIcon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3H5a2 2 0 0 0-2 2v3" /><path d="M21 8V5a2 2 0 0 0-2-2h-3" /><path d="M3 16v3a2 2 0 0 0 2 2h3" /><path d="M16 21h3a2 2 0 0 0 2-2v-3" /><path d="M12 8v8" /><path d="M8 12h8" /></svg>}
+                      onClick={() => handleVideoFitChange('contain')}
+                    >
+                      ASPECT RATIO (CONTAIN)
+                    </Button>
+                  </Tooltip>
+                </div>
+              </Card>
 
-                <button
-                  onClick={() => handleVideoFitChange('contain')}
-                  className={`py-2.5 px-3 rounded-xl font-black text-xs transition cursor-pointer flex items-center justify-center space-x-2 ${
-                    videoFit === 'contain'
-                      ? 'bg-gradient-to-r from-pink-500 to-rose-600 text-white shadow-lg'
-                      : 'bg-white/10 text-white/70 hover:bg-white/15'
-                  }`}
-                >
-                  <i className="fa-solid fa-compress"></i>
-                  <span>ORIGINAL RATIO (CONTAIN)</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Target FPS */}
-            <div className="p-3 bg-white/5 rounded-2xl border border-white/10 flex items-center justify-between">
-              <div>
-                <div className="font-black text-sm text-white">Target Frame Rate</div>
-                <div className="text-[11px] text-white/60">60 FPS recommended for modern displays</div>
-              </div>
-              <button
-                onClick={() => {
-                  soundEngine.playClick();
-                  setFpsMode((m) => (m === '60' ? '30' : '60'));
-                  showToast(`Frame rate target set to ${fpsMode === '60' ? '30 FPS' : '60 FPS'}`);
-                }}
-                className="px-4 py-2 rounded-xl bg-purple-600 text-white font-black text-xs cursor-pointer shadow"
-              >
-                {fpsMode} FPS
-              </button>
-            </div>
-          </div>
-        )}
+              {/* Target FPS */}
+              <Card variant="filled" padding="md" className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="font-black text-body-medium text-white mb-1">Target Frame Rate</div>
+                  <div className="text-body-small text-on-surface-variant">60 FPS recommended for modern displays</div>
+                </div>
+                <Tooltip content="Toggle between 60 and 30 FPS" position="left">
+                  <Button
+                    variant="outlined"
+                    size="md"
+                    onClick={() => { soundEngine.playClick(); setFpsMode((m) => (m === '60' ? '30' : '60')); showToast(`Frame rate target set to ${fpsMode === '60' ? '30 FPS' : '60 FPS'}`); }}
+                  >
+                    {fpsMode} FPS
+                  </Button>
+                </Tooltip>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Tab 4: Data & Cache */}
-        {activeTab === 'data' && (
-          <div className="space-y-4 text-xs">
-            <div className="p-4 bg-white/5 rounded-2xl border border-white/10 space-y-3">
-              <div>
-                <div className="font-black text-sm text-white">Reset & Purge Local Data</div>
-                <div className="text-[11px] text-white/60">
-                  Clears cached songs, restores default catalog, and resets high scores.
+        <AnimatePresence mode="wait">
+          {activeTab === 'data' && (
+            <motion.div
+              key="data"
+              className="space-y-4"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <Card variant="filled" padding="lg" className="space-y-4">
+                <div className="space-y-2">
+                  <div className="font-black text-body-medium text-white">Reset & Purge Local Data</div>
+                  <div className="text-body-small text-on-surface-variant">
+                    Clears cached songs, restores default catalog, and resets high scores.
+                  </div>
                 </div>
-              </div>
 
-              <button
-                onClick={handleClearCache}
-                className="w-full py-2.5 bg-red-600/80 hover:bg-red-600 text-white rounded-xl font-black text-xs transition cursor-pointer flex items-center justify-center space-x-2 shadow-lg"
-              >
-                <i className="fa-solid fa-trash-can"></i>
-                <span>CLEAR CACHE & RESTORE DEFAULT CATALOG</span>
-              </button>
-            </div>
-          </div>
-        )}
+                <Tooltip content="This action cannot be undone" position="top">
+                  <Button
+                    variant="danger"
+                    size="lg"
+                    fullWidth
+                    leadingIcon={<svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>}
+                    onClick={handleClearCache}
+                    className="shadow-error-glow"
+                  >
+                    CLEAR CACHE & RESTORE DEFAULT CATALOG
+                  </Button>
+                </Tooltip>
 
-        {/* Toast confirmation message */}
-        {showStatusToast && (
-          <div className="py-2 px-4 rounded-xl bg-emerald-500 text-black font-black text-xs text-center shadow-lg animate-bounce">
-            {showStatusToast}
-          </div>
-        )}
-
-        {/* Footer */}
-        <div className="pt-2 border-t border-white/10 flex justify-end">
-          <button
-            onClick={() => {
-              soundEngine.playClick();
-              onClose();
-            }}
-            className="px-6 py-2.5 bg-gradient-to-r from-pink-500 to-rose-600 text-white rounded-xl font-black text-xs shadow-lg cursor-pointer transition hover:scale-105"
-          >
-            DONE
-          </button>
-        </div>
-      </div>
-    </div>
+                <div className="pt-4 border-t border-outline-variant space-y-2 text-body-small text-on-surface-variant">
+                  <p>Music Volume: <span className="text-brand-400 font-bold">{Math.round(musicVol * 100)}%</span></p>
+                  <p>SFX Volume: <span className="text-accent-400 font-bold">{Math.round(sfxVol * 100)}%</span></p>
+                  <p>Video Fit: <span className="text-sun-400 font-bold">{videoFit === 'cover' ? 'Fill Screen' : 'Aspect Ratio'}</span></p>
+                  <p>Camera: <span className="text-success-400 font-bold">{hasCamera ? 'Detected' : 'Phone Sync'}</span></p>
+                </div>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </Modal>
   );
 };
+
+export default SettingsModal;

@@ -59,3 +59,16 @@ export async function deleteVideoBlob(songId: string): Promise<void> {
     request.onerror = () => reject(request.error);
   });
 }
+
+// Clear all video blobs (for cache clearing)
+export async function clearAllVideoBlobs(): Promise<void> {
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE_VIDEOS, 'readwrite');
+    const store = transaction.objectStore(STORE_VIDEOS);
+    const request = store.clear();
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}

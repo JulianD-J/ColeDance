@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import * as ort from 'onnxruntime-web';
 import { yoloTracker, isRunningInIframe } from '../../services/yoloPoseTracker';
 import { detectDeviceCamera } from '../../services/cameraDetection';
@@ -6,6 +7,7 @@ import { soundEngine } from '../../services/soundEffects';
 import { getAllSongs } from '../../data/songsData';
 import { getVideoBlob } from '../../services/indexedDBStorage';
 import { YoloKeypoint, YoloPersonDetection } from '../../types/game';
+import { Modal, Button, Badge, Card, Chip, Tooltip, Input, Slider, Switch, Avatar, Skeleton, Progress } from '../ui';
 
 interface MaintenanceModeModalProps {
   onClose: () => void;
@@ -19,6 +21,21 @@ interface TestResult {
   details: string;
   data?: any;
 }
+
+const categoryIcons = {
+  'Environment': <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg>,
+  'ONNX / YOLO': <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a10 10 0 0 1 10 10A10 10 0 0 1 12 22 10 10 0 0 1 2 12 10 10 0 0 1 12 2" /><path d="M12 6v6l4 2" /></svg>,
+  'Video & Trimming': <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8" /><path d="M12 17v4" /></svg>,
+  'Camera & Motion': <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>,
+  'Scoring & State': <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="16" /></svg>,
+};
+
+const statusStyles = {
+  PASS: 'bg-success-500/20 border-success-500/40 text-success-400',
+  WARN: 'bg-sun-500/20 border-sun-500/40 text-sun-400',
+  FAIL: 'bg-error-500/20 border-error-500/40 text-error-400',
+  PENDING: 'bg-surface-2 border-outline-variant text-on-surface-variant',
+};
 
 export const MaintenanceModeModal: React.FC<MaintenanceModeModalProps> = ({ onClose }) => {
   const [activeTab, setActiveTab] = useState<'tests' | 'camera_monitor' | 'video_testbench' | 'logs'>('tests');
@@ -93,7 +110,7 @@ export const MaintenanceModeModal: React.FC<MaintenanceModeModalProps> = ({ onCl
       name: 'Hardware Concurrency & Memory',
       category: 'Environment',
       status: cores >= 4 ? 'PASS' : 'WARN',
-      details: `CPU Cores: ${cores} • Estimated Device RAM: ${memory} GB`,
+      details: `CPU Cores: ${cores} \u2022 Estimated Device RAM: ${memory} GB`,
       data: { hardwareConcurrency: cores, deviceMemory: memory },
     });
 
@@ -200,7 +217,6 @@ export const MaintenanceModeModal: React.FC<MaintenanceModeModalProps> = ({ onCl
     });
 
     // 7. Coordinate Frozen / Static Fallback Detection
-    // Check if uploaded songs contain identical coordinates
     const songs = getAllSongs();
     const customTrained = songs.filter((s) => s.isCustomTrained && s.unlimitedCoachFrames && s.unlimitedCoachFrames.length > 5);
     let duplicateCoordCount = 0;
@@ -285,7 +301,6 @@ export const MaintenanceModeModal: React.FC<MaintenanceModeModalProps> = ({ onCl
 
   // Live Camera Monitor Loop
   useEffect(() => {
-    let animId = 0;
     let isActive = true;
 
     if (activeTab === 'camera_monitor' && cameraVideoRef.current && cameraCanvasRef.current) {
@@ -310,16 +325,15 @@ export const MaintenanceModeModal: React.FC<MaintenanceModeModalProps> = ({ onCl
             coordinateHistoryRef.current.shift();
           }
 
-          // Calculate variance across last 20 frames for nose and left wrist
+          // Calculate variance across last 20 frames for nose
           if (coordinateHistoryRef.current.length >= 10) {
             const hist = coordinateHistoryRef.current;
             const noseXs = hist.map((h) => h[0]?.x || 0);
-            const wristXs = hist.map((h) => h[9]?.x || 0);
             const meanNose = noseXs.reduce((a, b) => a + b, 0) / noseXs.length;
             const variance = noseXs.reduce((a, b) => a + Math.pow(b - meanNose, 2), 0) / noseXs.length;
 
             setLiveVariance(variance);
-            setIsCoordinateFrozen(variance < 0.000001);
+            setIsCoordinateFrozen(variance < 0.00001);
           }
         }
       });
@@ -327,7 +341,6 @@ export const MaintenanceModeModal: React.FC<MaintenanceModeModalProps> = ({ onCl
 
     return () => {
       isActive = false;
-      if (animId) cancelAnimationFrame(animId);
       if (activeTab === 'camera_monitor') {
         yoloTracker.stopCamera();
       }
@@ -394,9 +407,9 @@ export const MaintenanceModeModal: React.FC<MaintenanceModeModalProps> = ({ onCl
     if (frames.length >= 2) {
       const diffX = Math.abs(parseFloat(frames[0].nose?.x || 0) - parseFloat(frames[1].nose?.x || 0));
       if (diffX < 0.0001) {
-        addLog('⚠️ WARNING: Sample video scan produced identical coordinates across different timestamps!');
+        addLog('\u26a0\ufe0f WARNING: Sample video scan produced identical coordinates across different timestamps!');
       } else {
-        addLog(`✅ SUCCESS: Video scan produced dynamic motion coordinates (delta X = ${diffX.toFixed(4)})`);
+        addLog(`\u2705 SUCCESS: Video scan produced dynamic motion coordinates (delta X = ${diffX.toFixed(4)})`);
       }
     }
   };
@@ -447,382 +460,442 @@ export const MaintenanceModeModal: React.FC<MaintenanceModeModalProps> = ({ onCl
     addLog('Exported coledance_diagnostics.json to user downloads!');
   };
 
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-xl p-2 sm:p-4 select-none">
-      <div className="bg-[#0b0622] border-2 border-cyan-400 rounded-3xl max-w-5xl w-full h-[92vh] flex flex-col p-4 sm:p-6 shadow-[0_0_80px_rgba(0,210,255,0.4)] text-white relative overflow-hidden">
-        {/* Top Header */}
-        <div className="flex justify-between items-center pb-3 border-b border-white/10 shrink-0">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 border border-cyan-400 flex items-center justify-center text-cyan-300 text-lg shadow">
-              <i className="fa-solid fa-screwdriver-wrench animate-bounce"></i>
-            </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <h2 className="text-lg sm:text-xl font-black italic tracking-wider text-white">
-                  COLEDANCE TEMPORAL MAINTENANCE & SYSTEM DIAGNOSTICS
-                </h2>
-                <span className="text-[10px] font-black bg-pink-600 text-white px-2 py-0.5 rounded uppercase">
-                  DIAGNOSTIC MODE
-                </span>
-              </div>
-              <p className="text-[11px] text-cyan-300/80 font-medium">
-                Automated tests, video trimmer inspector, real-time coordinate monitor & full JSON export.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <button
+    <Modal
+      isOpen={true}
+      onClose={() => { soundEngine.playClick(); onClose(); }}
+      title="TEMPORAL MAINTENANCE & SYSTEM DIAGNOSTICS"
+      description="Automated tests, video trimmer inspector, real-time coordinate monitor & full JSON export"
+      size="max"
+      variant="default"
+      showCloseButton={true}
+      footer={
+        <div className="flex gap-3 w-full">
+          <Tooltip content="Export diagnostic report as JSON" position="top">
+            <Button
+              variant="primary"
+              size="md"
+              fullWidth
+              leadingIcon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>}
               onClick={handleExportDiagnosticJSON}
-              className="px-3.5 py-2 bg-gradient-to-r from-pink-500 via-rose-600 to-yellow-400 text-white font-black italic text-xs rounded-xl shadow-[0_0_20px_rgba(255,20,147,0.8)] border border-white/30 hover:scale-105 active:scale-95 transition cursor-pointer flex items-center space-x-1.5"
+              className="shadow-brand-glow"
             >
-              <i className="fa-solid fa-file-arrow-down"></i>
-              <span>EXPORT DIAGNOSTIC JSON</span>
-            </button>
-
-            <button
-              onClick={onClose}
-              className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-xs text-white cursor-pointer ml-1"
-            >
-              <i className="fa-solid fa-xmark"></i>
-            </button>
-          </div>
+              EXPORT DIAGNOSTIC JSON
+            </Button>
+          </Tooltip>
+          <Button variant="outlined" fullWidth onClick={() => { soundEngine.playClick(); onClose(); }}>Close</Button>
         </div>
-
+      }
+    >
+      <motion.div
+        className="space-y-5 h-full overflow-hidden"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
         {/* Tab Navigation */}
-        <div className="flex space-x-2 bg-black/50 p-1.5 rounded-2xl border border-white/10 mt-3 shrink-0">
-          <button
-            onClick={() => setActiveTab('tests')}
-            className={`flex-1 py-2 rounded-xl text-xs font-black transition cursor-pointer flex items-center justify-center space-x-1.5 ${
-              activeTab === 'tests' ? 'bg-cyan-600 text-white shadow-lg' : 'text-white/60 hover:text-white'
-            }`}
-          >
-            <i className="fa-solid fa-clipboard-check"></i>
-            <span>SYSTEM HEALTH TESTS</span>
-          </button>
+        <div className="flex gap-2 bg-surface-1/50 p-1.5 rounded-2xl border border-outline-variant shrink-0">
+          <Tooltip content="System Health Tests" position="bottom">
+            <Button
+              variant={activeTab === 'tests' ? 'primary' : 'ghost'}
+              size="sm"
+              fullWidth
+              leadingIcon={categoryIcons['Environment']}
+              onClick={() => { soundEngine.playClick(); setActiveTab('tests'); }}
+            >
+              SYSTEM HEALTH TESTS
+            </Button>
+          </Tooltip>
 
-          <button
-            onClick={() => setActiveTab('camera_monitor')}
-            className={`flex-1 py-2 rounded-xl text-xs font-black transition cursor-pointer flex items-center justify-center space-x-1.5 ${
-              activeTab === 'camera_monitor' ? 'bg-cyan-600 text-white shadow-lg' : 'text-white/60 hover:text-white'
-            }`}
-          >
-            <i className="fa-solid fa-camera"></i>
-            <span>LIVE COORDINATE MONITOR</span>
-          </button>
+          <Tooltip content="Live Camera & Skeleton Coordinate Monitor" position="bottom">
+            <Button
+              variant={activeTab === 'camera_monitor' ? 'primary' : 'ghost'}
+              size="sm"
+              fullWidth
+              leadingIcon={categoryIcons['Camera & Motion']}
+              onClick={() => { soundEngine.playClick(); setActiveTab('camera_monitor'); }}
+            >
+              LIVE COORDINATE MONITOR
+            </Button>
+          </Tooltip>
 
-          <button
-            onClick={() => setActiveTab('video_testbench')}
-            className={`flex-1 py-2 rounded-xl text-xs font-black transition cursor-pointer flex items-center justify-center space-x-1.5 ${
-              activeTab === 'video_testbench' ? 'bg-cyan-600 text-white shadow-lg' : 'text-white/60 hover:text-white'
-            }`}
-          >
-            <i className="fa-solid fa-film"></i>
-            <span>VIDEO TRIMMER & SCAN BENCH</span>
-          </button>
+          <Tooltip content="Video Trimmer & Frame Analyzer" position="bottom">
+            <Button
+              variant={activeTab === 'video_testbench' ? 'primary' : 'ghost'}
+              size="sm"
+              fullWidth
+              leadingIcon={categoryIcons['Video & Trimming']}
+              onClick={() => { soundEngine.playClick(); setActiveTab('video_testbench'); }}
+            >
+              VIDEO TRIMMER & SCAN BENCH
+            </Button>
+          </Tooltip>
 
-          <button
-            onClick={() => setActiveTab('logs')}
-            className={`flex-1 py-2 rounded-xl text-xs font-black transition cursor-pointer flex items-center justify-center space-x-1.5 ${
-              activeTab === 'logs' ? 'bg-cyan-600 text-white shadow-lg' : 'text-white/60 hover:text-white'
-            }`}
-          >
-            <i className="fa-solid fa-terminal"></i>
-            <span>CONSOLE LOGS ({systemLogs.length})</span>
-          </button>
+          <Tooltip content="System Console Logs" position="bottom">
+            <Button
+              variant={activeTab === 'logs' ? 'primary' : 'ghost'}
+              size="sm"
+              fullWidth
+              leadingIcon={categoryIcons['Scoring & State']}
+              onClick={() => { soundEngine.playClick(); setActiveTab('logs'); }}
+            >
+              CONSOLE LOGS ({systemLogs.length})
+            </Button>
+          </Tooltip>
         </div>
 
         {/* TAB 1: System Health Tests */}
-        {activeTab === 'tests' && (
-          <div className="flex-1 overflow-y-auto mt-3 pr-1 space-y-3">
-            <div className="flex justify-between items-center bg-black/40 p-3 rounded-2xl border border-white/10">
-              <div className="text-xs font-bold text-white/80">
-                Found {testResults.length} diagnostic instruments. Automated test runner is active.
-              </div>
-              <button
-                onClick={runAllDiagnostics}
-                disabled={isRunningTests}
-                className="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white rounded-xl text-xs font-black cursor-pointer transition shadow"
-              >
-                {isRunningTests ? 'RUNNING TESTS...' : 'RE-RUN ALL TESTS'}
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {testResults.map((test) => (
-                <div
-                  key={test.id}
-                  className={`p-3.5 rounded-2xl border backdrop-blur-md space-y-1.5 transition ${
-                    test.status === 'PASS'
-                      ? 'bg-emerald-950/40 border-emerald-500/40'
-                      : test.status === 'WARN'
-                      ? 'bg-amber-950/40 border-amber-500/40'
-                      : test.status === 'FAIL'
-                      ? 'bg-rose-950/50 border-rose-500/50'
-                      : 'bg-black/40 border-white/10'
-                  }`}
-                >
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-white/60">
-                      {test.category}
-                    </span>
-                    <span
-                      className={`text-[9px] font-black px-2 py-0.5 rounded uppercase ${
-                        test.status === 'PASS'
-                          ? 'bg-emerald-500 text-black'
-                          : test.status === 'WARN'
-                          ? 'bg-amber-400 text-black'
-                          : 'bg-rose-500 text-white'
-                      }`}
-                    >
-                      {test.status}
-                    </span>
-                  </div>
-
-                  <h3 className="text-sm font-black text-white">{test.name}</h3>
-                  <p className="text-xs text-white/80 leading-relaxed">{test.details}</p>
+        <AnimatePresence mode="wait">
+          {activeTab === 'tests' && (
+            <motion.div
+              key="tests"
+              className="flex-1 overflow-y-auto space-y-4"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <Card variant="filled" padding="md" className="flex flex-wrap justify-between items-center gap-3">
+                <div className="text-label-medium font-semibold text-on-surface-variant">
+                  Found {testResults.length} diagnostic instruments. Automated test runner is active.
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+                <Button
+                  variant="primary"
+                  size="sm"
+                  leadingIcon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 4v6h-6" /><path d="M1 20v-6h6" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>}
+                  onClick={runAllDiagnostics}
+                  disabled={isRunningTests}
+                >
+                  {isRunningTests ? 'RUNNING TESTS...' : 'RE-RUN ALL TESTS'}
+                </Button>
+              </Card>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {testResults.map((test) => {
+                  const Icon = categoryIcons[test.category] || categoryIcons['Environment'];
+                  return (
+                    <Card
+                      key={test.id}
+                      variant="filled"
+                      padding="md"
+                      className={`border-l-4 ${statusStyles[test.status]}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-label-small font-black uppercase tracking-wider text-on-surface-variant">{Icon}</span>
+                            <Badge variant="ghost" size="sm" className={statusStyles[test.status]}>{test.status}</Badge>
+                          </div>
+                          <h3 className="text-body-medium font-black text-white">{test.name}</h3>
+                          <p className="text-body-small text-on-surface/80 leading-relaxed mt-1">{test.details}</p>
+                        </div>
+                        <span className="text-label-small font-bold text-on-surface-variant shrink-0">{test.category}</span>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* TAB 2: Live Camera & Skeleton Coordinate Monitor */}
-        {activeTab === 'camera_monitor' && (
-          <div className="flex-1 overflow-y-auto mt-3 pr-1 space-y-3">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Camera Video with YOLO overlay */}
-              <div className="md:col-span-2 relative h-72 bg-black rounded-2xl overflow-hidden border-2 border-cyan-500/60 shadow-xl flex items-center justify-center">
-                <video
-                  ref={cameraVideoRef}
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover transform -scale-x-100"
-                />
-                <canvas
-                  ref={cameraCanvasRef}
-                  width={640}
-                  height={360}
-                  className="absolute inset-0 w-full h-full transform -scale-x-100 pointer-events-none"
-                />
+        <AnimatePresence mode="wait">
+          {activeTab === 'camera_monitor' && (
+            <motion.div
+              key="camera_monitor"
+              className="flex-1 overflow-y-auto space-y-4"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* Camera Video with YOLO overlay */}
+                <div className="lg:col-span-2 space-y-3">
+                  <Card variant="filled" padding="none" className="overflow-hidden">
+                    <div className="relative aspect-video bg-black rounded-xl overflow-hidden border-2 border-accent-500/60 shadow-xl flex items-center justify-center">
+                      <video
+                        ref={cameraVideoRef}
+                        playsInline
+                        muted
+                        className="w-full h-full object-cover -scale-x-100"
+                      />
+                      <canvas
+                        ref={cameraCanvasRef}
+                        width={640}
+                        height={360}
+                        className="absolute inset-0 w-full h-full -scale-x-100 pointer-events-none"
+                      />
 
-                {!cameraActive && (
-                  <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center space-y-2 text-xs text-white/60">
-                    <i className="fa-solid fa-spinner animate-spin text-2xl text-cyan-400"></i>
-                    <span>Initializing camera device stream...</span>
-                  </div>
-                )}
-
-                {/* Status HUD */}
-                <div className="absolute top-2 left-2 bg-black/80 px-2.5 py-1 rounded-lg border border-white/20 text-[10px] font-black flex items-center space-x-2">
-                  <span className={`w-2 h-2 rounded-full ${isCoordinateFrozen ? 'bg-rose-500 animate-ping' : 'bg-emerald-400 animate-pulse'}`}></span>
-                  <span>{isCoordinateFrozen ? 'STATIC / FROZEN COORDINATES' : 'DYNAMIC MOTION TRACKING'}</span>
-                </div>
-              </div>
-
-              {/* Real-time Coordinate Telemetry */}
-              <div className="bg-black/50 p-4 rounded-2xl border border-white/10 space-y-3">
-                <h3 className="text-xs font-black uppercase text-cyan-300">Live Joint Telemetry</h3>
-
-                <div className="space-y-1 text-[11px] font-mono bg-black/70 p-2.5 rounded-xl border border-white/10">
-                  <div className="flex justify-between text-white/60">
-                    <span>Joint</span>
-                    <span>X</span>
-                    <span>Y</span>
-                  </div>
-                  {liveDetections[0]?.keypoints ? (
-                    <>
-                      <div className="flex justify-between text-yellow-300 font-bold">
-                        <span>Nose (0)</span>
-                        <span>{liveDetections[0].keypoints[0]?.x.toFixed(4) || '—'}</span>
-                        <span>{liveDetections[0].keypoints[0]?.y.toFixed(4) || '—'}</span>
-                      </div>
-                      <div className="flex justify-between text-pink-400">
-                        <span>L.Shoulder (5)</span>
-                        <span>{liveDetections[0].keypoints[5]?.x.toFixed(4) || '—'}</span>
-                        <span>{liveDetections[0].keypoints[5]?.y.toFixed(4) || '—'}</span>
-                      </div>
-                      <div className="flex justify-between text-pink-400">
-                        <span>R.Shoulder (6)</span>
-                        <span>{liveDetections[0].keypoints[6]?.x.toFixed(4) || '—'}</span>
-                        <span>{liveDetections[0].keypoints[6]?.y.toFixed(4) || '—'}</span>
-                      </div>
-                      <div className="flex justify-between text-cyan-300 font-bold">
-                        <span>L.Wrist (9)</span>
-                        <span>{liveDetections[0].keypoints[9]?.x.toFixed(4) || '—'}</span>
-                        <span>{liveDetections[0].keypoints[9]?.y.toFixed(4) || '—'}</span>
-                      </div>
-                      <div className="flex justify-between text-cyan-300 font-bold">
-                        <span>R.Wrist (10)</span>
-                        <span>{liveDetections[0].keypoints[10]?.x.toFixed(4) || '—'}</span>
-                        <span>{liveDetections[0].keypoints[10]?.y.toFixed(4) || '—'}</span>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-white/40 text-center py-4">No joints in frame</div>
-                  )}
-                </div>
-
-                <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-xs space-y-1">
-                  <div className="flex justify-between">
-                    <span className="text-white/60">Motion Variance:</span>
-                    <span className="font-mono text-yellow-300 font-bold">{liveVariance.toFixed(6)}</span>
-                  </div>
-                  <p className="text-[10px] text-white/70">
-                    Wave your right arm! If numbers stay fixed or variance remains &lt; 0.00001, the system is falling back to a static standing skeleton.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 3: Video Trimmer & Scan Bench */}
-        {activeTab === 'video_testbench' && (
-          <div className="flex-1 overflow-y-auto mt-3 pr-1 space-y-3">
-            <div className="bg-black/50 p-4 rounded-2xl border border-white/10 flex flex-wrap justify-between items-center gap-3">
-              <div>
-                <h3 className="text-sm font-black text-white">Coach Video Trimming & Frame Analyzer</h3>
-                <p className="text-xs text-white/70">
-                  Load any routine video to test duration without the 120s cutoff and verify trim boundaries.
-                </p>
-              </div>
-
-              <label className="px-4 py-2 bg-pink-600 hover:bg-pink-500 text-white rounded-xl text-xs font-black cursor-pointer transition shadow">
-                <i className="fa-solid fa-file-video mr-1.5"></i>
-                <span>SELECT VIDEO FILE</span>
-                <input type="file" accept="video/*" onChange={handleTestVideoUpload} className="hidden" />
-              </label>
-            </div>
-
-            {testVideoSrc && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-3">
-                  <div className="relative h-56 bg-black rounded-2xl overflow-hidden border border-white/20 shadow">
-                    <video
-                      ref={testbenchVideoRef}
-                      src={testVideoSrc}
-                      controls
-                      onLoadedMetadata={handleTestbenchVideoLoaded}
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
-
-                  {/* Trimmer Controls */}
-                  <div className="bg-black/60 p-3.5 rounded-2xl border border-white/10 space-y-2.5">
-                    <div className="flex justify-between text-xs font-bold text-white">
-                      <span>Full Length: {testVideoDuration.toFixed(1)}s</span>
-                      <span className="text-pink-400">
-                        Trimmed Duration: {(trimEnd - trimStart).toFixed(1)}s
-                      </span>
-                    </div>
-
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-[11px] text-white/70">
-                        <span>Start Trim: {trimStart}s</span>
-                        <span>End Trim: {trimEnd}s</span>
-                      </div>
-                      <div className="flex space-x-2">
-                        <input
-                          type="range"
-                          min="0"
-                          max={testVideoDuration || 100}
-                          value={trimStart}
-                          onChange={(e) => {
-                            const val = parseFloat(e.target.value);
-                            setTrimStart(val);
-                            if (testbenchVideoRef.current) testbenchVideoRef.current.currentTime = val;
-                          }}
-                          className="w-full accent-pink-500"
-                        />
-                        <input
-                          type="range"
-                          min="0"
-                          max={testVideoDuration || 100}
-                          value={trimEnd}
-                          onChange={(e) => {
-                            const val = parseFloat(e.target.value);
-                            setTrimEnd(val);
-                            if (testbenchVideoRef.current) testbenchVideoRef.current.currentTime = val;
-                          }}
-                          className="w-full accent-cyan-400"
-                        />
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={runTestbenchScanSample}
-                      disabled={isScanningTestVideo}
-                      className="w-full py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-black text-xs rounded-xl shadow cursor-pointer transition hover:scale-[1.01]"
-                    >
-                      {isScanningTestVideo ? 'SAMPLING FRAMES...' : 'RUN 5-FRAME SAMPLER TEST'}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Sampler Output */}
-                <div className="bg-black/60 p-3.5 rounded-2xl border border-white/10 space-y-2 flex flex-col">
-                  <h4 className="text-xs font-black uppercase text-cyan-300">Sample Scan Output</h4>
-                  <div className="flex-1 overflow-y-auto space-y-2 pr-1 font-mono text-[11px]">
-                    {testScanFrames.length === 0 ? (
-                      <div className="text-white/40 text-center py-10">
-                        Click "Run 5-Frame Sampler Test" to analyze keypoint movement between trim points.
-                      </div>
-                    ) : (
-                      testScanFrames.map((f, i) => (
-                        <div key={i} className="p-2 rounded-lg bg-white/5 border border-white/10 space-y-1">
-                          <div className="flex justify-between text-yellow-300 font-bold">
-                            <span>Frame #{i + 1} @ {f.timestamp}s</span>
-                            <span>Coaches Detected: {f.coachCount}</span>
-                          </div>
-                          <div className="text-[10px] text-white/80">
-                            Nose: X={f.nose?.x || '—'}, Y={f.nose?.y || '—'} • LeftWrist: X={f.leftWrist?.x || '—'}, Y={f.leftWrist?.y || '—'}
-                          </div>
+                      {!cameraActive && (
+                        <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center space-y-2 text-body-small text-on-surface-variant">
+                          <motion.div className="w-10 h-10 border-4 border-accent-500 border-t-transparent rounded-full animate-spin" />
+                          <span>Initializing camera device stream...</span>
                         </div>
-                      ))
+                      )}
+
+                      {/* Status HUD */}
+                      <div className="absolute top-3 left-3 bg-surface-0/80 backdrop-blur px-3 py-1.5 rounded-xl border border-white/20 text-label-small font-bold flex items-center gap-2">
+                        <motion.span
+                          className={`w-2 h-2 rounded-full ${isCoordinateFrozen ? 'bg-error-500 animate-ping' : 'bg-success-400 animate-pulse'}`}
+                        />
+                        <span>{isCoordinateFrozen === true ? 'STATIC / FROZEN COORDINATES' : isCoordinateFrozen === false ? 'DYNAMIC MOTION TRACKING' : 'ANALYZING...'}</span>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Live Joint Telemetry */}
+                  <Card variant="filled" padding="md" className="space-y-3">
+                    <h3 className="text-label-medium font-black uppercase text-accent-400 tracking-wider">Live Joint Telemetry</h3>
+                    <div className="space-y-1 text-body-small font-mono bg-surface-1/50 p-3 rounded-xl border border-outline-variant">
+                      <div className="flex justify-between text-on-surface-variant font-bold">
+                        <span>Joint</span>
+                        <span>X</span>
+                        <span>Y</span>
+                        <span>Conf</span>
+                      </div>
+                      {liveDetections[0]?.keypoints ? (
+                        <>
+                          <div className="flex justify-between text-sun-400 font-bold">
+                            <span>Nose (0)</span>
+                            <span>{liveDetections[0].keypoints[0]?.x.toFixed(4) || '\u2014'}</span>
+                            <span>{liveDetections[0].keypoints[0]?.y.toFixed(4) || '\u2014'}</span>
+                            <span>{liveDetections[0].keypoints[0]?.confidence.toFixed(2) || '\u2014'}</span>
+                          </div>
+                          <div className="flex justify-between text-brand-400">
+                            <span>L.Shoulder (5)</span>
+                            <span>{liveDetections[0].keypoints[5]?.x.toFixed(4) || '\u2014'}</span>
+                            <span>{liveDetections[0].keypoints[5]?.y.toFixed(4) || '\u2014'}</span>
+                            <span>{liveDetections[0].keypoints[5]?.confidence.toFixed(2) || '\u2014'}</span>
+                          </div>
+                          <div className="flex justify-between text-brand-400">
+                            <span>R.Shoulder (6)</span>
+                            <span>{liveDetections[0].keypoints[6]?.x.toFixed(4) || '\u2014'}</span>
+                            <span>{liveDetections[0].keypoints[6]?.y.toFixed(4) || '\u2014'}</span>
+                            <span>{liveDetections[0].keypoints[6]?.confidence.toFixed(2) || '\u2014'}</span>
+                          </div>
+                          <div className="flex justify-between text-accent-400 font-bold">
+                            <span>L.Wrist (9)</span>
+                            <span>{liveDetections[0].keypoints[9]?.x.toFixed(4) || '\u2014'}</span>
+                            <span>{liveDetections[0].keypoints[9]?.y.toFixed(4) || '\u2014'}</span>
+                            <span>{liveDetections[0].keypoints[9]?.confidence.toFixed(2) || '\u2014'}</span>
+                          </div>
+                          <div className="flex justify-between text-accent-400 font-bold">
+                            <span>R.Wrist (10)</span>
+                            <span>{liveDetections[0].keypoints[10]?.x.toFixed(4) || '\u2014'}</span>
+                            <span>{liveDetections[0].keypoints[10]?.y.toFixed(4) || '\u2014'}</span>
+                            <span>{liveDetections[0].keypoints[10]?.confidence.toFixed(2) || '\u2014'}</span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-center py-4 text-on-surface-variant">No joints in frame</div>
+                      )}
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-surface-1/50 border border-outline-variant text-body-small space-y-1">
+                      <div className="flex justify-between">
+                        <span className="text-on-surface-variant">Motion Variance:</span>
+                        <span className="font-mono font-bold text-sun-400">{liveVariance.toFixed(6)}</span>
+                      </div>
+                      <p className="text-on-surface-variant/70">
+                        {"Wave your right arm! If numbers stay fixed or variance remains < 0.00001, the system is falling back to a static standing skeleton."}
+                      </p>
+                    </div>
+                  </Card>
+                </div>
+
+                {/* Detected Persons List */}
+                <Card variant="filled" padding="md" className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-label-small font-black uppercase text-accent-400 tracking-wider">DETECTED PEOPLE ({liveDetections.length}/5)</span>
+                    <Badge variant={cameraActive ? 'success' : 'ghost'} size="sm" dot dotColor={cameraActive ? 'success' : 'warning'}>
+                      {cameraActive ? 'LIVE' : 'OFFLINE'}
+                    </Badge>
+                  </div>
+
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {liveDetections.map((p) => {
+                      const personColors = ['#d91e6d', '#0ea5e9', '#f59e0b', '#22c55e', '#a855f7'];
+                      return (
+                        <div key={p.id} className="p-2.5 rounded-xl bg-surface-1/50 border border-outline-variant flex items-center justify-between text-body-small font-bold">
+                          <div className="flex items-center gap-2">
+                            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: personColors[(p.id - 1) % personColors.length] }} />
+                            <span>Person #{p.id}</span>
+                          </div>
+                          <div className="text-label-small font-mono text-sun-400">{Math.round(p.score * 100)}% CONF</div>
+                        </div>
+                      );
+                    })}
+
+                    {liveDetections.length === 0 && cameraActive && (
+                      <div className="text-center py-6 text-body-small text-on-surface-variant italic">
+                        No person detected. Stand in camera view!
+                      </div>
                     )}
                   </div>
-                </div>
+
+                  <Tooltip content="YOLOv8/11 detects up to 5 dancers simultaneously. Persons are assigned IDs from Left to Right." position="top">
+                    <div className="p-2 rounded-xl bg-surface-1/50 border border-outline-variant text-label-small text-on-surface-variant/70">
+                      {"\u{1f4a1} YOLOv8/11 detects up to 5 dancers simultaneously. Persons are assigned IDs from Left to Right."}
+                    </div>
+                  </Tooltip>
+                </Card>
               </div>
-            )}
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* TAB 3: Video Trimmer & Scan Bench */}
+        <AnimatePresence mode="wait">
+          {activeTab === 'video_testbench' && (
+            <motion.div
+              key="video_testbench"
+              className="flex-1 overflow-y-auto space-y-4"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <Card variant="filled" padding="md" className="flex flex-wrap justify-between items-center gap-3">
+                <div>
+                  <h3 className="text-body-medium font-black text-white">Coach Video Trimming & Frame Analyzer</h3>
+                  <p className="text-body-small text-on-surface-variant">Load any routine video to test duration without the 120s cutoff and verify trim boundaries.</p>
+                </div>
+
+                <Tooltip content="Select video file for analysis" position="top">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    leadingIcon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>}
+                  >
+                    <input type="file" accept="video/*" onChange={handleTestVideoUpload} className="hidden" />
+                    SELECT VIDEO FILE
+                  </Button>
+                </Tooltip>
+              </Card>
+
+              {testVideoSrc && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <div className="space-y-3">
+                    <Card variant="filled" padding="none" className="overflow-hidden">
+                      <div className="relative aspect-video bg-black rounded-xl overflow-hidden border border-outline-variant shadow">
+                        <video
+                          ref={testbenchVideoRef}
+                          src={testVideoSrc}
+                          controls
+                          onLoadedMetadata={handleTestbenchVideoLoaded}
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                    </Card>
+
+                    {/* Trimmer Controls */}
+                    <Card variant="filled" padding="md" className="space-y-3">
+                      <div className="flex justify-between text-label-medium font-bold text-white">
+                        <span>Full Length: {testVideoDuration.toFixed(1)}s</span>
+                        <span className="text-brand-400">Trimmed Duration: {(trimEnd - trimStart).toFixed(1)}s</span>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-body-small text-on-surface-variant">
+                          <span>Start Trim: {trimStart}s</span>
+                          <span>End Trim: {trimEnd}s</span>
+                        </div>
+                        <div className="flex gap-3">
+                          <input
+                            type="range"
+                            min="0"
+                            max={testVideoDuration || 100}
+                            value={trimStart}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value);
+                              setTrimStart(val);
+                              if (testbenchVideoRef.current) testbenchVideoRef.current.currentTime = val;
+                            }}
+                            className="flex-1 accent-brand-500 h-2"
+                          />
+                          <input
+                            type="range"
+                            min="0"
+                            max={testVideoDuration || 100}
+                            value={trimEnd}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value);
+                              setTrimEnd(val);
+                              if (testbenchVideoRef.current) testbenchVideoRef.current.currentTime = val;
+                            }}
+                            className="flex-1 accent-accent-500 h-2"
+                          />
+                        </div>
+                      </div>
+
+                      <Button
+                        variant="primary"
+                        size="md"
+                        fullWidth
+                        leadingIcon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a10 10 0 0 1 10 10A10 10 0 0 1 12 22 10 10 0 0 1 2 12 10 10 0 0 1 12 2" /><path d="M12 6v6l4 2" /></svg>}
+                        disabled={isScanningTestVideo}
+                        onClick={runTestbenchScanSample}
+                      >
+                        {isScanningTestVideo ? 'SAMPLING FRAMES...' : 'RUN 5-FRAME SAMPLER TEST'}
+                      </Button>
+                    </Card>
+                  </div>
+
+                  {/* Sampler Output */}
+                  <Card variant="filled" padding="md" className="space-y-3 h-full">
+                    <h4 className="text-label-medium font-black uppercase text-accent-400">Sample Scan Output</h4>
+                    <div className="flex-1 overflow-y-auto space-y-2 pr-1 font-mono text-body-small">
+                      {testScanFrames.length === 0 ? (
+                        <div className="text-center py-10 text-on-surface-variant">
+                          Click "Run 5-Frame Sampler Test" to analyze keypoint movement between trim points.
+                        </div>
+                      ) : (
+                        testScanFrames.map((f, i) => (
+                          <div key={i} className="p-3 rounded-lg bg-surface-1/50 border border-outline-variant space-y-1">
+                            <div className="flex justify-between text-sun-400 font-bold">
+                              <span>Frame #{i + 1} @ {f.timestamp}s</span>
+                              <span>Coaches Detected: {f.coachCount}</span>
+                            </div>
+                            <div className="text-body-small text-on-surface-variant">
+                              Nose: X={f.nose?.x || '\u2014'}, Y={f.nose?.y || '\u2014'} \u2022 LeftWrist: X={f.leftWrist?.x || '\u2014'}, Y={f.leftWrist?.y || '\u2014'}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </Card>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* TAB 4: System Console Logs */}
-        {activeTab === 'logs' && (
-          <div className="flex-1 overflow-y-auto mt-3 p-3 bg-black/80 rounded-2xl border border-white/10 font-mono text-[11px] text-cyan-300 space-y-1">
-            {systemLogs.map((log, idx) => (
-              <div key={idx} className="leading-relaxed">
-                {log}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Bottom Bar with Export Trigger */}
-        <div className="pt-3 border-t border-white/10 flex flex-wrap justify-between items-center gap-2 shrink-0">
-          <div className="text-[11px] text-white/70">
-            Export includes: Automated health diagnostics, video scan telemetry, and live camera coordinate variances.
-          </div>
-
-          <div className="flex space-x-2">
-            <button
-              onClick={handleExportDiagnosticJSON}
-              className="px-5 py-2.5 bg-gradient-to-r from-pink-500 to-rose-600 hover:scale-105 transition font-black italic text-xs rounded-xl shadow-lg border border-white/20 cursor-pointer flex items-center space-x-2"
+        <AnimatePresence mode="wait">
+          {activeTab === 'logs' && (
+            <motion.div
+              key="logs"
+              className="flex-1 overflow-y-auto p-3 bg-surface-0/80 rounded-2xl border border-outline-variant font-mono text-body-small text-accent-400 space-y-1"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
             >
-              <i className="fa-solid fa-download"></i>
-              <span>EXPORT RESULTS (.JSON)</span>
-            </button>
-
-            <button
-              onClick={onClose}
-              className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition cursor-pointer"
-            >
-              CLOSE
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+              {systemLogs.map((log, idx) => (
+                <div key={idx} className="leading-relaxed border-b border-outline-variant/50 py-1">
+                  {log}
+                </div>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </Modal>
   );
 };
+
+export default MaintenanceModeModal;

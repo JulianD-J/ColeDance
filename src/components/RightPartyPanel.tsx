@@ -1,6 +1,8 @@
 import React from 'react';
+import { motion } from 'motion/react';
 import { Player } from '../types/game';
 import { soundEngine } from '../services/soundEffects';
+import { IconButton, Avatar, Tooltip, Badge, Card } from './ui';
 
 interface RightPartyPanelProps {
   players: Player[];
@@ -16,80 +18,99 @@ export const RightPartyPanel: React.FC<RightPartyPanelProps> = ({
   onOpenDancerCard,
 }) => {
   return (
-    <aside className="hidden lg:flex fixed right-0 top-0 bottom-0 w-16 z-40 flex-col items-center justify-between py-5 bg-[#070312]/95 border-l border-white/10 backdrop-blur-xl select-none">
+    <motion.aside
+      className="hidden lg:flex fixed right-0 top-0 bottom-0 w-16 z-[350] flex-col items-center justify-between py-5 bg-surface-0/95 border-l border-outline-variant backdrop-blur-xl select-none"
+      initial={{ opacity: 0, x: 50 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: 0.2, type: 'spring', stiffness: 500, damping: 30 }}
+    >
       {/* Top: Party Lounge Icon */}
-      <button
-        onClick={() => {
-          soundEngine.playClick();
-          onOpenPhonePairing();
-        }}
-        title="Party Lobby & Smartphone Controllers"
-        className="w-10 h-10 rounded-xl bg-cyan-950/40 hover:bg-cyan-900/60 border border-cyan-400/30 flex items-center justify-center text-xs text-cyan-300 transition cursor-pointer shadow"
-      >
-        <i className="fa-solid fa-mobile-screen text-sm"></i>
-      </button>
+      <Tooltip content="Party Lobby & Smartphone Controllers" position="left">
+        <IconButton
+          variant="secondary"
+          size="md"
+          aria-label="Open Phone Pairing"
+          onClick={() => { soundEngine.playClick(); onOpenPhonePairing(); }}
+          className="shadow-accent-glow"
+        >
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="5" y="2" width="14" height="20" rx="2" /><line x1="12" y1="18" x2="12.01" y2="18" /></svg>
+        </IconButton>
+      </Tooltip>
 
       {/* Center: Dancers Stack */}
-      <div className="flex flex-col items-center space-y-3.5">
-        <span className="text-[9px] font-black tracking-widest text-white/40 uppercase">
+      <motion.div
+        className="flex flex-col items-center space-y-3 flex-1"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+      >
+        <motion.span
+          className="text-label-small font-black tracking-widest text-on-surface-variant uppercase"
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ type: 'spring', stiffness: 500, damping: 17 }}
+        >
           LOBBY
-        </span>
+        </motion.span>
 
         {players.map((p, idx) => (
-          <div
-            key={p.id || idx}
-            onClick={() => {
-              soundEngine.playClick();
-              if (idx === 0) {
-                onOpenProfileEditor();
-              } else {
-                onOpenDancerCard(p);
-              }
-            }}
-            title={`${p.name} (Click to view dancer card)`}
-            className="relative group cursor-pointer transition transform hover:scale-110"
-          >
-            <div
-              className="w-10 h-10 rounded-xl p-[2px] shadow-lg"
-              style={{
-                background: `linear-gradient(135deg, ${p.color}, #00d2ff)`,
+          <Tooltip key={p.id || idx} content={`${p.name} • ${p.isPhoneController ? 'Phone' : 'Camera'}`} position="left">
+            <motion.div
+              onClick={() => {
+                soundEngine.playClick();
+                if (idx === 0) {
+                  onOpenProfileEditor();
+                } else {
+                  onOpenDancerCard(p);
+                }
               }}
+              className="relative group cursor-pointer"
+              whileHover={{ scale: 1.15 }}
+              whileTap={{ scale: 0.95 }}
+              initial={{ opacity: 0, x: 30 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.05 * idx, type: 'spring', stiffness: 500, damping: 30 }}
             >
-              <img
+              <Avatar
                 src={`https://api.dicebear.com/7.x/bottts/svg?seed=${p.avatarSeed}`}
-                className="w-full h-full rounded-[10px] bg-indigo-950 object-cover"
                 alt={p.name}
+                name={p.name}
+                size="lg"
+                border
+                borderColor={p.isPhoneController ? 'success' : 'brand'}
+                status={p.isPhoneController ? 'online' : 'online'}
+                statusPosition="bottom-right"
               />
-            </div>
 
-            {/* Input hardware type indicator */}
-            <span
-              className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border border-black flex items-center justify-center text-[7px] font-bold ${
-                p.isPhoneController ? 'bg-emerald-400 text-black' : 'bg-pink-500 text-white'
-              }`}
-            >
-              <i className={`fa-solid ${p.isPhoneController ? 'fa-mobile-screen' : 'fa-video'}`}></i>
-            </span>
-
-            {/* Hover Tooltip */}
-            <div className="absolute right-14 top-1/2 -translate-y-1/2 bg-[#0d0720] text-white text-[10px] font-bold px-2.5 py-1 rounded-lg border border-white/20 opacity-0 group-hover:opacity-100 transition whitespace-nowrap pointer-events-none z-50 shadow-xl">
-              P{idx + 1}: {p.name}
-            </div>
-          </div>
+              {/* Player Number Badge */}
+              <motion.div
+                className="absolute -bottom-1 -left-1 w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black text-white"
+                style={{ background: `linear-gradient(135deg, ${p.color}, #0ea5e9)` }}
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 17, delay: 0.1 }}
+              >
+                {idx + 1}
+              </motion.div>
+            </motion.div>
+          </Tooltip>
         ))}
-      </div>
+      </motion.div>
 
       {/* Bottom: Invite / Pair More Dancers */}
-      <button
-        onClick={() => {
-          soundEngine.playClick();
-          onOpenPhonePairing();
-        }}
-        title="Connect Smartphone or Camera Dancers"
-        className="w-10 h-10 rounded-xl bg-pink-950/40 hover:bg-pink-600 border border-pink-500/40 transition flex items-center justify-center text-pink-300 hover:text-white text-xs shadow-md cursor-pointer group"
-      >
-        <i className="fa-solid fa-user-plus text-xs"></i>
-      </button>
-    </aside>
+      <Tooltip content="Connect Smartphone or Camera Dancers" position="left">
+        <IconButton
+          variant="primary"
+          size="md"
+          aria-label="Add Dancer"
+          onClick={() => { soundEngine.playClick(); onOpenPhonePairing(); }}
+          className="shadow-brand-glow"
+        >
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" /></svg>
+        </IconButton>
+      </Tooltip>
+    </motion.aside>
   );
 };
+
+export default RightPartyPanel;

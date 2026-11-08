@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Player } from '../../types/game';
 import { soundEngine } from '../../services/soundEffects';
+import { Modal, Button, Badge, Chip, Avatar, Tooltip, Card } from '../ui';
 
 interface StoreModalProps {
   player: Player;
@@ -26,12 +28,19 @@ const SIGNATURE_COLORS = [
   { name: 'Flame Sunset Orange', hex: '#f97316' },
 ];
 
+const rarityStyles = {
+  'VIP Legendary': 'text-sun-400 bg-sun-500/15 border-sun-500/30',
+  'VIP Epic': 'text-brand-400 bg-brand-500/15 border-brand-500/30',
+  'VIP Mythic': 'text-sun-400 bg-sun-500/15 border-sun-500/30',
+  'VIP Rare': 'text-success-400 bg-success-500/15 border-success-500/30',
+};
+
 export const StoreModal: React.FC<StoreModalProps> = ({
   player,
   onUpdatePlayer,
   onClose,
 }) => {
-  const [activeTab, setActiveTab] = useState<'pass' | 'avatars' | 'colors'>('avatars');
+  const [activeTab, setActiveTab] = useState<'avatars' | 'colors'>('avatars');
   const [isVipActive, setIsVipActive] = useState<boolean>(() => {
     return localStorage.getItem('coledance_vip_active') === 'true';
   });
@@ -66,183 +75,210 @@ export const StoreModal: React.FC<StoreModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 select-none">
-      <div className="max-w-2xl w-full bg-[#130b33]/95 border-2 border-pink-500/80 rounded-3xl p-5 sm:p-7 shadow-[0_0_50px_rgba(255,20,147,0.4)] text-white space-y-5 max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex justify-between items-center pb-3 border-b border-white/10">
-          <div className="flex items-center space-x-2.5">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-yellow-400 to-pink-600 flex items-center justify-center text-lg text-white shadow-lg">
-              <i className="fa-solid fa-crown text-yellow-300"></i>
-            </div>
-            <div>
-              <h2 className="text-xl sm:text-2xl font-black italic tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-pink-500">
-                COLEDANCE+ VIP STORE
-              </h2>
-              <p className="text-[11px] text-white/60">Equip exclusive dancer avatars, glow themes & VIP tracks</p>
-            </div>
-          </div>
-
-          <button
-            onClick={() => {
-              soundEngine.playClick();
-              onClose();
-            }}
-            className="w-8 h-8 rounded-full bg-white/10 hover:bg-red-600/80 flex items-center justify-center text-white/70 hover:text-white transition cursor-pointer"
-          >
-            ✕
-          </button>
-        </div>
-
+    <Modal
+      isOpen={true}
+      onClose={() => { soundEngine.playClick(); onClose(); }}
+      title="COLEDANCE+ VIP STORE"
+      description="Equip exclusive dancer avatars, glow themes & VIP tracks"
+      size="xl"
+      variant="form"
+      showCloseButton={true}
+      footer={
+        <Button variant="primary" size="md" onClick={() => { soundEngine.playClick(); onClose(); }} className="shadow-brand-glow">
+          DONE
+        </Button>
+      }
+    >
+      <motion.div
+        className="space-y-5"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
         {/* VIP Pass Banner */}
-        <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-900/90 via-pink-900/90 to-indigo-950 border border-yellow-300/40 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 rounded-2xl bg-yellow-400 text-black flex items-center justify-center text-2xl shadow-lg shrink-0">
-              <i className="fa-solid fa-gem"></i>
-            </div>
-            <div>
-              <div className="text-xs font-black uppercase text-yellow-300 tracking-wider">
-                COLEDANCE+ UNLIMITED VIP PASS
-              </div>
-              <div className="text-[11px] text-white/80">
-                Unlock all signature coach outfits, custom avatars, and neon themes
-              </div>
-            </div>
-          </div>
-
-          <button
-            onClick={handleToggleVip}
-            className={`px-5 py-2.5 rounded-full font-black text-xs italic tracking-wider transition cursor-pointer shadow-lg shrink-0 ${
-              isVipActive
-                ? 'bg-emerald-400 text-black shadow-emerald-400/40 font-extrabold'
-                : 'bg-gradient-to-r from-yellow-400 to-pink-500 text-black hover:scale-105'
-            }`}
+        <Card variant="filled" padding="md" className="bg-gradient-to-r from-purple-900/60 via-pink-900/60 to-indigo-900/60 border-yellow-400/40 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <motion.div
+            className="flex items-center gap-4"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
           >
-            {isVipActive ? '✓ VIP ACTIVE' : '★ ACTIVATE VIP PASS'}
-          </button>
-        </div>
+            <motion.div
+              className="w-12 h-12 rounded-2xl bg-gradient-to-r from-sun-400 to-sun-500 text-black flex items-center justify-center text-2xl shadow-sun-glow shrink-0"
+              initial={{ scale: 0, rotate: -180 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 17 }}
+            >
+              <svg className="w-7 h-7" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
+            </motion.div>
+            <div>
+              <div className="text-label-small font-black uppercase text-sun-400 tracking-wider">COLEDANCE+ UNLIMITED VIP PASS</div>
+              <div className="text-body-small text-on-surface-variant">Unlock all signature coach outfits, custom avatars, and neon themes</div>
+            </div>
+          </motion.div>
+
+          <Tooltip content={isVipActive ? 'Deactivate VIP Pass' : 'Activate VIP Pass'} position="left">
+            <Button
+              variant={isVipActive ? 'success' : 'secondary'}
+              size="md"
+              onClick={handleToggleVip}
+              className={isVipActive ? 'shadow-success-glow' : 'shadow-sun-glow'}
+            >
+              {isVipActive ? '✓ VIP ACTIVE' : '★ ACTIVATE VIP PASS'}
+            </Button>
+          </Tooltip>
+        </Card>
 
         {/* Tab Navigation */}
-        <div className="flex space-x-2 bg-black/40 p-1 rounded-xl border border-white/10 text-xs font-black">
+        <div className="flex gap-2 bg-surface-1/50 p-1.5 rounded-2xl border border-outline-variant">
           {[
-            { id: 'avatars', label: 'VIP Avatars' },
-            { id: 'colors', label: 'Signature Colors' },
+            { id: 'avatars', label: 'VIP Avatars', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg> },
+            { id: 'colors', label: 'Signature Colors', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg> },
           ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => {
-                soundEngine.playClick();
-                setActiveTab(tab.id as any);
-              }}
-              className={`flex-1 py-2 rounded-lg transition cursor-pointer text-xs font-black ${
-                activeTab === tab.id
-                  ? 'bg-pink-600 text-white shadow'
-                  : 'text-white/60 hover:text-white'
-              }`}
-            >
-              {tab.label}
-            </button>
+            <Tooltip key={tab.id} content={tab.label} position="bottom">
+              <Button
+                variant={activeTab === tab.id ? 'primary' : 'ghost'}
+                size="sm"
+                fullWidth
+                leadingIcon={tab.icon}
+                onClick={() => { soundEngine.playClick(); setActiveTab(tab.id as any); }}
+              >
+                {tab.label}
+              </Button>
+            </Tooltip>
           ))}
         </div>
 
         {/* Tab 1: Avatars */}
-        {activeTab === 'avatars' && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {STORE_AVATARS.map((av) => {
-              const isEquipped = player.avatarSeed === av.seed;
+        <AnimatePresence mode="wait">
+          {activeTab === 'avatars' && (
+            <motion.div
+              key="avatars"
+              className="grid grid-cols-2 sm:grid-cols-3 gap-3"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              {STORE_AVATARS.map((av, index) => {
+                const isEquipped = player.avatarSeed === av.seed;
+                const rarityStyle = rarityStyles[av.rarity as keyof typeof rarityStyles] || rarityStyles['VIP Rare'];
 
-              return (
-                <div
-                  key={av.seed}
-                  className={`p-3 rounded-2xl bg-black/50 border transition flex flex-col items-center space-y-2 relative overflow-hidden ${
-                    isEquipped ? 'border-pink-500 shadow-[0_0_20px_rgba(255,20,147,0.4)]' : 'border-white/10 hover:border-white/30'
-                  }`}
-                >
-                  <span className="text-[9px] font-black uppercase text-yellow-300 bg-yellow-950/60 px-1.5 py-0.2 rounded border border-yellow-500/30">
-                    {av.rarity}
-                  </span>
+                return (
+                  <Tooltip key={av.seed} content={`${av.name} • ${av.rarity}`} position="top">
+                    <motion.div
+                      className={`
+                        p-4 rounded-2xl bg-surface-1/50 border transition-all motion-spring flex flex-col items-center space-y-3 relative overflow-hidden
+                        ${isEquipped ? 'border-brand-500 shadow-brand-glow ring-1 ring-brand-500/20' : 'border-outline-variant hover:border-brand-500'}
+                      `}
+                      whileHover={{ y: -4, scale: 1.02 }}
+                      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ delay: 0.05 * index, type: 'spring', stiffness: 500, damping: 30 }}
+                    >
+                      <Badge variant="ghost" size="sm" className={rarityStyle}>
+                        {av.rarity}
+                      </Badge>
 
-                  <div className="w-16 h-16 rounded-full p-0.5 shadow-lg bg-gradient-to-tr from-yellow-300 to-pink-500">
-                    <img
-                      src={`https://api.dicebear.com/7.x/bottts/svg?seed=${av.seed}`}
-                      alt={av.name}
-                      className="w-full h-full rounded-full bg-indigo-950 object-cover"
-                    />
-                  </div>
+                      <motion.div
+                        className="w-20 h-20 rounded-full p-0.5 shadow-level-2 bg-gradient-to-tr from-sun-400 to-brand-500"
+                        initial={{ scale: 0, rotate: -180 }}
+                        animate={{ scale: 1, rotate: 0 }}
+                        transition={{ type: 'spring', stiffness: 500, damping: 17, delay: 0.1 }}
+                      >
+                        <Avatar src={`https://api.dicebear.com/7.x/bottts/svg?seed=${av.seed}`} alt={av.name} name={av.name} size="3xl" />
+                      </motion.div>
 
-                  <div className="text-xs font-black text-white truncate">{av.name}</div>
+                      <motion.h4 className="text-body-medium font-black text-white text-center truncate w-full" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>{av.name}</motion.h4>
 
-                  <button
-                    onClick={() => handleEquipAvatar(av.seed)}
-                    className={`w-full py-1.5 rounded-xl text-[10px] font-black transition cursor-pointer ${
-                      isEquipped
-                        ? 'bg-emerald-500 text-black font-extrabold cursor-default'
-                        : 'bg-white/10 hover:bg-pink-600 text-white'
-                    }`}
-                  >
-                    {isEquipped ? 'EQUIPPED' : 'EQUIP NOW'}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                      <Tooltip content={isEquipped ? 'Currently equipped' : 'Equip this avatar'} position="bottom">
+                        <Button
+                          variant={isEquipped ? 'success' : 'primary'}
+                          size="sm"
+                          fullWidth
+                          onClick={() => handleEquipAvatar(av.seed)}
+                          disabled={isEquipped}
+                        >
+                          {isEquipped ? 'EQUIPPED' : 'EQUIP NOW'}
+                        </Button>
+                      </Tooltip>
+                    </motion.div>
+                  </Tooltip>
+                );
+              })}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Tab 2: Signature Glow Colors */}
-        {activeTab === 'colors' && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {SIGNATURE_COLORS.map((col) => {
-              const isEquipped = player.color.toLowerCase() === col.hex.toLowerCase();
+        <AnimatePresence mode="wait">
+          {activeTab === 'colors' && (
+            <motion.div
+              key="colors"
+              className="grid grid-cols-2 sm:grid-cols-3 gap-3"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              {SIGNATURE_COLORS.map((col, index) => {
+                const isEquipped = player.color.toLowerCase() === col.hex.toLowerCase();
 
-              return (
-                <div
-                  key={col.hex}
-                  className={`p-3 rounded-2xl bg-black/50 border transition flex flex-col items-center space-y-2.5 ${
-                    isEquipped ? 'border-white shadow-xl' : 'border-white/10 hover:border-white/25'
-                  }`}
-                >
-                  <div
-                    className="w-12 h-12 rounded-full shadow-lg border-2 border-white/50"
-                    style={{ backgroundColor: col.hex, boxShadow: `0 0 15px ${col.hex}` }}
-                  ></div>
+                return (
+                  <Tooltip key={col.hex} content={col.name} position="top">
+                    <motion.div
+                      className={`
+                        p-4 rounded-2xl bg-surface-1/50 border transition-all motion-spring flex flex-col items-center space-y-3
+                        ${isEquipped ? 'border-white shadow-xl ring-2 ring-white/20' : 'border-outline-variant hover:border-white/30'}
+                      `}
+                      whileHover={{ y: -4, scale: 1.02 }}
+                      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ delay: 0.05 * index, type: 'spring', stiffness: 500, damping: 30 }}
+                    >
+                      <motion.div
+                        className="w-16 h-16 rounded-full shadow-lg border-2 border-white/30"
+                        style={{ backgroundColor: col.hex, boxShadow: `0 0 20px ${col.hex}` }}
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: 'spring', stiffness: 500, damping: 17, delay: 0.05 * index }}
+                      />
 
-                  <div className="text-xs font-black text-white text-center">{col.name}</div>
+                      <motion.h4 className="text-body-small font-black text-white text-center truncate w-full" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>{col.name}</motion.h4>
 
-                  <button
-                    onClick={() => handleEquipColor(col.hex, col.name)}
-                    className={`w-full py-1.5 rounded-xl text-[10px] font-black transition cursor-pointer ${
-                      isEquipped
-                        ? 'bg-emerald-500 text-black font-extrabold'
-                        : 'bg-white/10 hover:bg-white/20 text-white'
-                    }`}
-                  >
-                    {isEquipped ? 'CURRENT COLOR' : 'APPLY COLOR'}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                      <Tooltip content={isEquipped ? 'Currently active color' : 'Apply this signature color'} position="bottom">
+                        <Button
+                          variant={isEquipped ? 'success' : 'outlined'}
+                          size="sm"
+                          fullWidth
+                          onClick={() => handleEquipColor(col.hex, col.name)}
+                          disabled={isEquipped}
+                        >
+                          {isEquipped ? 'CURRENT COLOR' : 'APPLY COLOR'}
+                        </Button>
+                      </Tooltip>
+                    </motion.div>
+                  </Tooltip>
+                );
+              })}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Toast confirmation message */}
-        {toastMessage && (
-          <div className="py-2 px-4 rounded-xl bg-pink-500 text-white font-black text-xs text-center shadow-lg animate-bounce">
-            {toastMessage}
-          </div>
-        )}
-
-        {/* Footer */}
-        <div className="pt-2 border-t border-white/10 flex justify-end">
-          <button
-            onClick={() => {
-              soundEngine.playClick();
-              onClose();
-            }}
-            className="px-6 py-2.5 bg-gradient-to-r from-pink-500 to-rose-600 text-white rounded-xl font-black text-xs shadow-lg cursor-pointer transition hover:scale-105"
-          >
-            DONE
-          </button>
-        </div>
-      </div>
-    </div>
+        <AnimatePresence>
+          {toastMessage && (
+            <motion.div
+              className="p-3 rounded-xl bg-brand-500/20 border border-brand-500/30 text-center"
+              initial={{ opacity: 0, y: -10, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: 'auto' }}
+              exit={{ opacity: 0, y: -10, height: 0 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+            >
+              <span className="text-body-small font-black text-brand-400">{toastMessage}</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </Modal>
   );
 };
+
+export default StoreModal;

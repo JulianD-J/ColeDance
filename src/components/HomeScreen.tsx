@@ -1,8 +1,23 @@
 import React, { useState, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Song, Player } from '../types/game';
 import { soundEngine } from '../services/soundEffects';
 import { getRankConfig } from '../services/momentumScoring';
 import { exportCdncePackage, downloadCdnceBlob, importCdncePackage } from '../services/cdncePackageService';
+import {
+  Card,
+  CardMedia,
+  CardContent,
+  CardActions,
+  Button,
+  IconButton,
+  Avatar,
+  Badge,
+  Chip,
+  Progress,
+  Skeleton,
+  Tooltip,
+} from './ui';
 
 interface HomeScreenProps {
   songs: Song[];
@@ -14,6 +29,14 @@ interface HomeScreenProps {
 }
 
 type FilterCategory = 'all' | '2026' | 'cardio' | 'party' | 'custom';
+
+const filterTabs: { id: FilterCategory; label: string; icon: React.ReactNode; color: 'brand' | 'accent' | 'sun' | 'success' }[] = [
+  { id: 'all', label: 'All Routines', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg>, color: 'brand' },
+  { id: '2026', label: '2026 Releases', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>, color: 'accent' },
+  { id: 'cardio', label: 'High Intensity', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>, color: 'sun' },
+  { id: 'party', label: 'Multi-Coach', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>, color: 'success' },
+  { id: 'custom', label: 'Community', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>, color: 'sun' },
+];
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   songs,
@@ -31,10 +54,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const cdnceFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const heroSong = songs[0] || null;
-  const primaryPlayer = players[0] || { name: 'Player 1', avatarSeed: 'PandaJD', color: '#ff1493' };
+  const primaryPlayer = players[0] || { name: 'Player 1', avatarSeed: 'PandaJD', color: '#ff1493', rank: 'Bronze' };
   const playerRank = getRankConfig(primaryPlayer.rank || 'Bronze');
 
-  // Filter songs based on interactive category tabs
   const filteredSongs = songs.filter((s) => {
     if (selectedFilter === '2026') return s.year >= 2024;
     if (selectedFilter === 'cardio') return s.bpm >= 130 || s.difficulty === 'Hard' || s.difficulty === 'Extreme';
@@ -42,14 +64,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     if (selectedFilter === 'custom') return s.isCustomTrained;
     return true;
   });
-
-  const filterTabs: { id: FilterCategory; label: string; count: number }[] = [
-    { id: 'all', label: 'All Routines', count: songs.length },
-    { id: '2026', label: '2026 Releases', count: songs.filter((s) => s.year >= 2024).length },
-    { id: 'cardio', label: 'High Intensity', count: songs.filter((s) => s.bpm >= 130 || s.difficulty === 'Hard' || s.difficulty === 'Extreme').length },
-    { id: 'party', label: 'Multi-Coach Duos', count: songs.filter((s) => (s.detectedCoachCount ?? s.coaches?.length ?? 1) >= 2).length },
-    { id: 'custom', label: 'Community Custom', count: songs.filter((s) => s.isCustomTrained).length },
-  ];
 
   const handleExportSong = async (e: React.MouseEvent, song: Song) => {
     e.stopPropagation();
@@ -73,7 +87,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     if (!file) return;
     soundEngine.playClick();
     setIsImporting(true);
-    setImportStatus('Importing .cdnce routine package (extracting high-res video and moves)...');
+    setImportStatus('Importing .cdnce routine package...');
 
     try {
       const imported = await importCdncePackage(file);
@@ -90,8 +104,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     }
   };
 
+  const coachCount = heroSong?.detectedCoachCount || heroSong?.coaches?.length || 1;
+  const difficultyColor = heroSong?.difficulty === 'Extreme' ? 'error' : heroSong?.difficulty === 'Hard' ? 'warning' : 'success';
+
   return (
-    <section className="flex-1 flex flex-col space-y-8 select-none pb-12 max-w-7xl mx-auto w-full">
+    <motion.section
+      className="flex-1 flex flex-col space-y-8 pb-12 max-w-7xl mx-auto w-full px-4"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: 'easeOut' }}
+    >
       {/* Hidden .cdnce input */}
       <input
         ref={cdnceFileInputRef}
@@ -102,23 +124,48 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       />
 
       {/* Import / Export Notification Banner */}
-      {importStatus && (
-        <div className="w-full p-3 rounded-2xl bg-gradient-to-r from-pink-950/90 via-purple-950/90 to-cyan-950/90 border border-pink-500/50 shadow-2xl flex items-center justify-between animate-fadeIn text-xs font-bold text-white">
-          <div className="flex items-center space-x-2">
-            <i className={`fa-solid ${isImporting ? 'fa-spinner animate-spin text-cyan-300' : 'fa-check text-emerald-400'}`}></i>
-            <span>{importStatus}</span>
-          </div>
-          <button
-            onClick={() => setImportStatus('')}
-            className="text-white/60 hover:text-white px-2 cursor-pointer"
+      <AnimatePresence>
+        {importStatus && (
+          <motion.div
+            className="w-full p-4 rounded-2xl bg-gradient-to-r from-brand-900/50 via-purple-900/50 to-accent-900/50 border border-brand-500/30 shadow-level-2 flex items-center justify-between"
+            initial={{ opacity: 0, y: -20, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: 'auto' }}
+            exit={{ opacity: 0, y: -20, height: 0 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
           >
-            <i className="fa-solid fa-xmark"></i>
-          </button>
-        </div>
-      )}
+            <div className="flex items-center gap-3">
+              <motion.div
+                className={`w-8 h-8 rounded-xl flex items-center justify-center ${isImporting ? 'bg-accent-500/20 text-accent-400 animate-spin' : 'bg-success-500/20 text-success-400'}`}
+                initial={{ scale: 0, rotate: -180 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 17 }}
+              >
+                {isImporting ? (
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10" strokeOpacity="0.25" /><path d="M12 2a10 10 0 0 1 10 10" /></svg>
+                ) : (
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+                )}
+              </motion.div>
+              <span className="text-body-medium font-semibold text-white">{importStatus}</span>
+            </div>
+            <motion.button
+              onClick={() => setImportStatus('')}
+              className="p-1 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+              whileTap={{ scale: 0.9 }}
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            </motion.button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Cinematic Stage Spotlight Hero Banner */}
-      <div className="relative w-full rounded-3xl overflow-hidden border border-white/15 shadow-[0_20px_50px_rgba(0,0,0,0.8)] bg-[#0c071a]">
+      <motion.div
+        className="relative w-full rounded-3xl overflow-hidden border border-white/10 shadow-level-4 bg-surface-0"
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1, duration: 0.6, ease: 'easeOut' }}
+      >
         {/* Real High-Fidelity Concert Arena Backdrop */}
         <div className="absolute inset-0 z-0">
           <img
@@ -126,359 +173,449 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             alt="ColeDance Concert Stage"
             className="w-full h-full object-cover object-center transform scale-105 filter brightness-75 contrast-110"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#070312] via-[#070312]/80 to-transparent"></div>
-          <div className="absolute inset-0 bg-gradient-to-t from-[#070312] via-transparent to-[#070312]/40"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-surface-0 via-surface-0/80 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-surface-0 via-transparent to-surface-0/40" />
         </div>
 
-        {/* Hero Content: Check if any songs exist in library */}
+        {/* Hero Content */}
         {heroSong ? (
-          <div className="relative z-10 px-6 sm:px-10 md:px-14 py-8 md:py-12 max-w-2xl flex flex-col justify-center space-y-4">
-            <div className="flex items-center gap-2.5 text-xs text-white/70">
-              <span className="font-black tracking-[0.2em] text-pink-400 uppercase">
-                Spotlight Routine
-              </span>
-              <span aria-hidden="true" className="text-white/40">·</span>
-              <span className="text-white/80 font-medium">ColeDance Routine</span>
-              <span aria-hidden="true" className="text-white/40">·</span>
-              <span className="text-cyan-300 font-medium">{heroSong.bpm} BPM</span>
-            </div>
+          <div className="relative z-10 px-6 sm:px-10 md:px-14 py-8 md:py-12 max-w-2xl flex flex-col justify-center space-y-6">
+            <motion.div
+              className="flex items-center gap-2.5 text-label-medium text-on-surface-variant"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <span className="font-black tracking-widest text-brand-400 uppercase">Spotlight Routine</span>
+              <span aria-hidden="true" className="text-on-surface-disabled">·</span>
+              <span className="text-on-surface/80 font-medium">ColeDance Routine</span>
+              <span aria-hidden="true" className="text-on-surface-disabled">·</span>
+              <Badge variant="secondary" size="sm" dot dotColor="accent">{heroSong.bpm} BPM</Badge>
+            </motion.div>
 
-            <div className="space-y-1">
-              <h1 className="text-4xl sm:text-5xl md:text-6xl font-black italic tracking-tight text-white uppercase drop-shadow-xl text-balance">
+            <motion.div className="space-y-2" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+              <h1 className="text-display-large font-black italic tracking-tight text-white text-balance">
                 {heroSong.title}
               </h1>
-              <p className="text-lg md:text-xl font-bold text-white/80 tracking-wide">
-                {heroSong.artist}
-              </p>
-            </div>
+              <p className="text-headline-medium font-semibold text-on-surface/80 tracking-wide">{heroSong.artist}</p>
+            </motion.div>
 
-            <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs text-white/70 font-medium pt-1">
-              <span className="flex items-center space-x-1.5 text-yellow-300">
-                <i className="fa-solid fa-bolt text-xs"></i>
-                <span className="font-bold">{heroSong.difficulty.toUpperCase()} CHOREO</span>
-              </span>
-              <span aria-hidden="true" className="text-white/30">·</span>
-              <span>{heroSong.coaches?.length || 1} Coaches</span>
-              <span aria-hidden="true" className="text-white/30">·</span>
-              <span>{heroSong.genre}</span>
-            </div>
+            <motion.div
+              className="flex items-center flex-wrap gap-3 text-label-medium text-on-surface-variant font-medium"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+            >
+              <Chip variant="primary" size="sm" icon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>}>
+                {heroSong.difficulty.toUpperCase()} CHOREO
+              </Chip>
+              <span aria-hidden="true" className="text-on-surface-disabled">·</span>
+              <Chip variant="secondary" size="sm" icon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></svg>}>
+                {coachCount} Coach{coachCount > 1 ? 'es' : ''}
+              </Chip>
+              <span aria-hidden="true" className="text-on-surface-disabled">·</span>
+              <Chip variant="ghost" size="sm">{heroSong.genre}</Chip>
+            </motion.div>
 
-            <div className="pt-3 flex flex-wrap items-center gap-3">
-              <button
-                onClick={() => {
-                  soundEngine.playClick();
-                  onSelectSong(heroSong);
-                }}
-                className="px-8 py-3.5 bg-gradient-to-r from-pink-500 via-rose-500 to-amber-400 hover:from-pink-400 hover:to-amber-300 active:scale-95 transition-all text-black font-black italic text-sm tracking-wider rounded-xl shadow-[0_0_25px_rgba(255,20,147,0.7)] flex items-center space-x-2.5 cursor-pointer whitespace-nowrap"
-              >
-                <i className="fa-solid fa-play text-xs text-black"></i>
-                <span>START DANCING</span>
-              </button>
+            <motion.div
+              className="pt-2 flex flex-wrap items-center gap-3"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+            >
+              <Tooltip content="Start dancing with this routine" position="top">
+                <Button
+                  variant="primary"
+                  size="lg"
+                  leadingIcon={<svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="5 3 19 12 5 21 5 3" /></svg>}
+                  onClick={() => { soundEngine.playClick(); onSelectSong(heroSong); }}
+                  className="shadow-brand-glow hover:shadow-brand-glow-lg"
+                >
+                  START DANCING
+                </Button>
+              </Tooltip>
 
-              <button
-                onClick={(e) => handleExportSong(e, heroSong)}
-                disabled={exportingSongId === heroSong.id}
-                className="px-5 py-3.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-amber-300 font-bold text-xs tracking-wider uppercase rounded-xl transition cursor-pointer flex items-center space-x-2 whitespace-nowrap backdrop-blur-md"
-                title="Export this routine as a shareable .cdnce package (video + moves)"
-              >
-                <i className={`fa-solid ${exportingSongId === heroSong.id ? 'fa-spinner animate-spin' : 'fa-file-export'}`}></i>
-                <span>EXPORT .CDNCE</span>
-              </button>
+              <Tooltip content="Export this routine as a shareable .cdnce package" position="top">
+                <Button
+                  variant="outlined"
+                  size="lg"
+                  leadingIcon={<svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>}
+                  disabled={exportingSongId === heroSong.id}
+                  onClick={(e) => handleExportSong(e, heroSong)}
+                >
+                  {exportingSongId === heroSong.id ? 'EXPORTING...' : 'EXPORT .CDNCE'}
+                </Button>
+              </Tooltip>
 
-              <button
-                onClick={() => {
-                  soundEngine.playClick();
-                  cdnceFileInputRef.current?.click();
-                }}
-                className="px-4 py-3.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs tracking-wider uppercase rounded-xl transition cursor-pointer flex items-center space-x-2 whitespace-nowrap backdrop-blur-md"
-              >
-                <i className="fa-solid fa-file-import text-cyan-300"></i>
-                <span>IMPORT .CDNCE</span>
-              </button>
-            </div>
+              <Tooltip content="Import a .cdnce routine package" position="top">
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  leadingIcon={<svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>}
+                  onClick={() => { soundEngine.playClick(); cdnceFileInputRef.current?.click(); }}
+                >
+                  IMPORT .CDNCE
+                </Button>
+              </Tooltip>
+            </motion.div>
           </div>
         ) : (
-          /* Empty Library Hero State */
-          <div className="relative z-10 px-6 sm:px-10 md:px-14 py-12 md:py-16 max-w-2xl flex flex-col justify-center space-y-4">
-            <div className="flex items-center gap-2.5 text-xs text-white/70">
-              <span className="font-black tracking-[0.2em] text-pink-400 uppercase">
-                COLEDANCE ARENA READY
-              </span>
-              <span aria-hidden="true" className="text-white/40">·</span>
-              <span className="text-cyan-300 font-medium">All Demos Cleared</span>
-            </div>
+          <div className="relative z-10 px-6 sm:px-10 md:px-14 py-12 md:py-16 max-w-2xl flex flex-col justify-center space-y-6 text-center">
+            <motion.div
+              className="flex items-center justify-center gap-2.5 text-label-medium text-on-surface-variant"
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <span className="font-black tracking-widest text-brand-400 uppercase">COLEDANCE ARENA READY</span>
+              <span aria-hidden="true" className="text-on-surface-disabled">·</span>
+              <span className="text-accent-400 font-medium">All Demos Cleared</span>
+            </motion.div>
 
-            <div className="space-y-1">
-              <h1 className="text-4xl sm:text-5xl md:text-6xl font-black italic tracking-tight text-white uppercase drop-shadow-xl text-balance">
+            <motion.div className="space-y-2" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+              <h1 className="text-display-large font-black italic tracking-tight text-white text-balance">
                 YOUR STAGE AWAITS
               </h1>
-              <p className="text-base sm:text-lg font-bold text-white/80 leading-relaxed">
-                Import any <span className="text-amber-300">.cdnce</span> routine package or train your own choreography from any MP4 video using AI pose detection.
+              <p className="text-body-large font-semibold text-on-surface/80 leading-relaxed">
+                Import any <span className="text-sun-400">.cdnce</span> routine package or train your own choreography from any MP4 video using AI pose detection.
               </p>
-            </div>
+            </motion.div>
 
-            <div className="pt-4 flex flex-wrap items-center gap-3.5">
-              <button
-                onClick={() => {
-                  soundEngine.playClick();
-                  cdnceFileInputRef.current?.click();
-                }}
-                className="px-8 py-4 bg-gradient-to-r from-amber-400 via-orange-500 to-pink-500 hover:from-amber-300 hover:to-pink-400 active:scale-95 transition-all text-black font-black italic text-sm tracking-wider rounded-xl shadow-[0_0_25px_rgba(245,158,11,0.6)] flex items-center space-x-2.5 cursor-pointer"
-              >
-                <i className="fa-solid fa-file-import text-sm"></i>
-                <span>IMPORT .CDNCE PACKAGE</span>
-              </button>
+            <motion.div
+              className="pt-2 flex flex-wrap items-center justify-center gap-3"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+            >
+              <Tooltip content="Import a .cdnce routine package" position="top">
+                <Button
+                  variant="primary"
+                  size="xl"
+                  leadingIcon={<svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>}
+                  onClick={() => { soundEngine.playClick(); cdnceFileInputRef.current?.click(); }}
+                >
+                  IMPORT .CDNCE PACKAGE
+                </Button>
+              </Tooltip>
 
-              <button
-                onClick={() => {
-                  soundEngine.playClick();
-                  onOpenTrainingStudio();
-                }}
-                className="px-6 py-4 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs tracking-wider uppercase rounded-xl transition cursor-pointer flex items-center space-x-2 backdrop-blur-md"
-              >
-                <i className="fa-solid fa-graduation-cap text-yellow-400 text-sm"></i>
-                <span>RECORD IN TRAINING STUDIO</span>
-              </button>
-            </div>
+              <Tooltip content="Open Training Studio to create custom routines" position="top">
+                <Button
+                  variant="outlined"
+                  size="xl"
+                  leadingIcon={<svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></svg>}
+                  onClick={() => { soundEngine.playClick(); onOpenTrainingStudio(); }}
+                >
+                  RECORD IN TRAINING STUDIO
+                </Button>
+              </Tooltip>
+            </motion.div>
           </div>
         )}
-      </div>
+      </motion.div>
 
       {/* Routine Tracklist Section */}
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
+      <motion.section
+        className="space-y-6"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+      >
+        {/* Section Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-sm font-black tracking-[0.2em] uppercase text-white/90">
-              Choreography Library ({songs.length})
-            </h2>
-            <p className="text-xs text-white/60">
-              Export routines as .cdnce packages to transfer between computers or import friends' routines
-            </p>
+            <h2 className="text-headline-small font-black tracking-wider text-white">Choreography Library</h2>
+            <p className="text-body-small text-on-surface-variant mt-1">Export routines as .cdnce packages to transfer between computers or import friends' routines</p>
           </div>
 
-          {/* Action cluster on library header */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                soundEngine.playClick();
-                cdnceFileInputRef.current?.click();
-              }}
-              className="px-3.5 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-amber-300 text-xs font-black rounded-lg transition cursor-pointer flex items-center space-x-1.5"
-            >
-              <i className="fa-solid fa-file-import text-xs"></i>
-              <span>Import .cdnce</span>
-            </button>
-
-            <button
-              onClick={() => {
-                soundEngine.playClick();
-                onOpenTrainingStudio();
-              }}
-              className="px-3.5 py-1.5 bg-pink-600/30 hover:bg-pink-600/50 border border-pink-400/40 text-pink-300 text-xs font-black rounded-lg transition cursor-pointer flex items-center space-x-1.5"
-            >
-              <i className="fa-solid fa-plus text-xs"></i>
-              <span>Train Routine</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Songs Grid */}
-        {filteredSongs.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredSongs.map((song) => {
-              const isHovered = hoveredSongId === song.id;
-              const coachCount = song.detectedCoachCount || song.coaches?.length || 1;
-
-              return (
-                <div
-                  key={song.id}
-                  onMouseEnter={() => setHoveredSongId(song.id)}
-                  onMouseLeave={() => setHoveredSongId(null)}
-                  onClick={() => {
-                    soundEngine.playClick();
-                    onSelectSong(song);
-                  }}
-                  className={`group relative rounded-2xl overflow-hidden border transition-all duration-200 cursor-pointer bg-[#0f0920] ${
-                    isHovered
-                      ? 'border-pink-500/80 shadow-[0_10px_30px_rgba(255,20,147,0.35)] -translate-y-1'
-                      : 'border-white/10 hover:border-white/30'
-                  }`}
-                >
-                  {/* Cover image */}
-                  <div className="relative aspect-[4/3] bg-slate-900 overflow-hidden">
-                    <img
-                      src={song.coverImg}
-                      alt={song.title}
-                      className="w-full h-full object-cover transform transition-transform duration-500 group-hover:scale-105"
-                      onError={(e) => {
-                        (e.target as HTMLElement).style.display = 'none';
-                      }}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 pointer-events-none"></div>
-
-                    {/* Coach Count Indicator */}
-                    <div className="absolute top-2.5 left-2.5 px-2 py-1 rounded-md bg-black/70 backdrop-blur-md border border-white/15 text-[10px] font-extrabold text-white flex items-center space-x-1.5 shadow">
-                      <i className="fa-solid fa-users text-cyan-400 text-[9px]"></i>
-                      <span>{coachCount} COACH{coachCount > 1 ? 'ES' : ''}</span>
-                    </div>
-
-                    {/* Export .cdnce button */}
-                    <button
-                      onClick={(e) => handleExportSong(e, song)}
-                      disabled={exportingSongId === song.id}
-                      className="absolute top-2.5 right-2.5 px-2 py-1 rounded-md bg-amber-500/80 hover:bg-amber-400 text-black text-[10px] font-black uppercase shadow cursor-pointer transition flex items-center space-x-1"
-                      title="Export .cdnce file for transfer between computers"
-                    >
-                      <i className={`fa-solid ${exportingSongId === song.id ? 'fa-spinner animate-spin' : 'fa-file-export'} text-[9px]`}></i>
-                      <span>.CDNCE</span>
-                    </button>
-
-                    {/* Bottom Row on Card */}
-                    <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between text-xs">
-                      <span className="text-[11px] font-bold text-white/90">
-                        {song.bpm} BPM
-                      </span>
-                      <span className={`text-[10px] font-black uppercase tracking-wider ${
-                        song.difficulty === 'Extreme'
-                          ? 'text-red-400'
-                          : song.difficulty === 'Hard'
-                          ? 'text-amber-300'
-                          : 'text-emerald-400'
-                      }`}>
-                        {song.difficulty}
-                      </span>
-                    </div>
-
-                    {/* Play Action Overlay on Hover */}
-                    <div className={`absolute inset-0 bg-pink-950/40 backdrop-blur-[2px] flex items-center justify-center transition-opacity duration-150 ${
-                      isHovered ? 'opacity-100' : 'opacity-0 pointer-events-none'
-                    }`}>
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-r from-pink-500 to-amber-400 flex items-center justify-center text-black shadow-lg transform transition-transform group-hover:scale-110">
-                        <i className="fa-solid fa-play text-sm ml-0.5"></i>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Track Details */}
-                  <div className="p-3.5 space-y-1">
-                    <div className="font-black italic text-base text-white tracking-wide truncate group-hover:text-pink-400 transition-colors">
-                      {song.title}
-                    </div>
-                    <div className="text-xs text-white/60 font-medium truncate">
-                      {song.artist}
-                    </div>
-                    <div className="text-[11px] text-white/40 pt-0.5 truncate">
-                      {song.genre}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="py-12 px-6 rounded-2xl bg-[#0f0920] border border-white/10 text-center space-y-3">
-            <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-xl text-white/40 mx-auto">
-              <i className="fa-solid fa-compact-disc"></i>
-            </div>
-            <div className="text-sm font-bold text-white/80">No choreography routines in library</div>
-            <p className="text-xs text-white/50 max-w-sm mx-auto">
-              Import a .cdnce file package from another machine or record any video in the AI Training Studio.
-            </p>
-            <div className="flex justify-center gap-3 pt-1">
-              <button
-                onClick={() => {
-                  soundEngine.playClick();
-                  cdnceFileInputRef.current?.click();
-                }}
-                className="px-4 py-2 bg-amber-500 text-black text-xs font-black rounded-xl cursor-pointer"
+          <div className="flex items-center gap-2 flex-wrap">
+            <Tooltip content="Import .cdnce routine package from file" position="top">
+              <Button
+                variant="secondary"
+                size="sm"
+                leadingIcon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>}
+                onClick={() => { soundEngine.playClick(); cdnceFileInputRef.current?.click(); }}
               >
                 Import .cdnce
-              </button>
-              <button
-                onClick={() => {
-                  soundEngine.playClick();
-                  onOpenTrainingStudio();
-                }}
-                className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-black rounded-xl border border-white/20 cursor-pointer"
+              </Button>
+            </Tooltip>
+
+            <Tooltip content="Open Training Studio to create custom routines" position="top">
+              <Button
+                variant="outlined"
+                size="sm"
+                leadingIcon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></svg>}
+                onClick={() => { soundEngine.playClick(); onOpenTrainingStudio(); }}
               >
-                Open Studio
-              </button>
-            </div>
+                + Add Routine
+              </Button>
+            </Tooltip>
           </div>
-        )}
-      </div>
+        </div>
+
+        {/* Filter Tabs */}
+        <motion.div
+          className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4 }}
+        >
+          {filterTabs.map((tab, index) => {
+            const isActive = selectedFilter === tab.id;
+            const count = songs.filter((s) => {
+              if (tab.id === 'all') return true;
+              if (tab.id === '2026') return s.year >= 2024;
+              if (tab.id === 'cardio') return s.bpm >= 130 || s.difficulty === 'Hard' || s.difficulty === 'Extreme';
+              if (tab.id === 'party') return (s.detectedCoachCount ?? s.coaches?.length ?? 1) >= 2;
+              if (tab.id === 'custom') return s.isCustomTrained;
+              return true;
+            }).length;
+
+            return (
+              <motion.button
+                key={tab.id}
+                onClick={() => { soundEngine.playClick(); setSelectedFilter(tab.id); }}
+                className={`
+                  flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-label-large shrink-0
+                  transition-all motion-spring
+                  ${isActive
+                    ? `bg-gradient-to-r from-${tab.color}-500 to-${tab.color}-600 text-white shadow-${tab.color}-glow`
+                    : 'bg-surface-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-3'
+                  }
+                `}
+                whileTap={{ scale: 0.97 }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.05 * index }}
+              >
+                <span aria-hidden="true">{tab.icon}</span>
+                <span>{tab.label}</span>
+                <span className={`
+                  w-5 h-5 rounded-full flex items-center justify-center text-label-small font-black
+                  ${isActive ? 'bg-white/20 text-white' : 'bg-white/10 text-on-surface-disabled'}
+                `}>
+                  {count}
+                </span>
+              </motion.button>
+            );
+          })}
+        </motion.div>
+
+        {/* Songs Grid */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={selectedFilter}
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+          >
+            {filteredSongs.length > 0 ? (
+              filteredSongs.map((song, index) => {
+                const isHovered = hoveredSongId === song.id;
+                const coachCount = song.detectedCoachCount || song.coaches?.length || 1;
+                const diffColor = song.difficulty === 'Extreme' ? 'error' : song.difficulty === 'Hard' ? 'warning' : 'success';
+
+                return (
+                  <Tooltip key={song.id} content={`${song.title} by ${song.artist}`} position="top">
+                    <Card
+                      variant="filled"
+                      interactive
+                      onClick={() => { soundEngine.playClick(); onSelectSong(song); }}
+                      className="group overflow-hidden"
+                      whileHover={{ y: -8, boxShadow: 'var(--shadow-level-4)' }}
+                      initial={{ opacity: 0, y: 30 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.05 * index, type: 'spring', stiffness: 500, damping: 30 }}
+                    >
+                      <CardMedia aspectRatio="video" rounded="none">
+                        <motion.img
+                          src={song.coverImg}
+                          alt={song.title}
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                          initial={{ scale: 1.1 }}
+                          animate={{ scale: 1 }}
+                          transition={{ duration: 0.5 }}
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 pointer-events-none" />
+
+                        {/* Coach Count Indicator */}
+                        <div className="absolute top-3 left-3">
+                          <Badge variant="secondary" size="sm" icon={<svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></svg>}>
+                            {coachCount} Coach{coachCount > 1 ? 'es' : ''}
+                          </Badge>
+                        </div>
+
+                        {/* Export .cdnce button */}
+                        <Tooltip content="Export .cdnce routine package" position="bottom">
+                          <IconButton
+                            variant="outlined"
+                            size="sm"
+                            aria-label="Export .cdnce"
+                            onClick={(e) => handleExportSong(e, song)}
+                            disabled={exportingSongId === song.id}
+                            className="absolute top-3 right-3"
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: isHovered ? 1 : 0, x: isHovered ? 0 : 20 }}
+                            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                          >
+                            {exportingSongId === song.id ? (
+                              <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10" strokeOpacity="0.25" /><path d="M12 2a10 10 0 0 1 10 10" /></svg>
+                            ) : (
+                              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+                            )}
+                          </IconButton>
+                        </Tooltip>
+
+                        {/* Bottom Row on Card */}
+                        <div className="absolute bottom-3 left-3 right-3 flex justify-between items-center">
+                          <span className="text-label-large font-bold text-white">{song.bpm} BPM</span>
+                          <Badge variant={diffColor} size="sm">{song.difficulty}</Badge>
+                        </div>
+
+                        {/* Play Action Overlay on Hover */}
+                        <motion.div
+                          className="absolute inset-0 bg-gradient-to-t from-brand-900/50 via-transparent to-transparent flex items-center justify-center"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: isHovered ? 1 : 0 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          <motion.div
+                            className="w-16 h-16 rounded-full bg-gradient-to-r from-brand-500 to-sun-400 flex items-center justify-center text-white shadow-level-3"
+                            initial={{ scale: 0.8 }}
+                            animate={{ scale: isHovered ? 1 : 0.8 }}
+                            transition={{ type: 'spring', stiffness: 500, damping: 17 }}
+                            whileTap={{ scale: 0.9 }}
+                          >
+                            <svg className="w-7 h-7 ml-1" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3" /></svg>
+                          </motion.div>
+                        </motion.div>
+                      </CardMedia>
+
+                      <CardContent className="p-4 space-y-2">
+                        <motion.h3
+                          className="font-black italic text-title-medium text-white group-hover:text-brand-400 transition-colors truncate"
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.05 * index }}
+                        >
+                          {song.title}
+                        </motion.h3>
+                        <p className="text-body-small text-on-surface-variant truncate">{song.artist}</p>
+                        <div className="flex items-center justify-between text-label-small text-on-surface-disabled pt-1">
+                          <span className="truncate max-w-[70%]">{song.genre}</span>
+                          {song.isCustomTrained && (
+                            <Badge variant="warning" size="sm" dot dotColor="sun">CUSTOM</Badge>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Tooltip>
+                );
+              })
+            ) : (
+              <motion.div
+                className="col-span-full py-16 px-6 rounded-2xl bg-surface-1 border border-outline-variant text-center space-y-4"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <motion.div className="w-16 h-16 rounded-2xl bg-surface-2 border border-outline mx-auto flex items-center justify-center text-2xl text-on-surface-variant" initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 500, damping: 17 }}>
+                  <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg>
+                </motion.div>
+                <div className="text-body-medium font-bold text-on-surface/80">No choreography routines in library</div>
+                <p className="text-body-small text-on-surface-variant max-w-sm mx-auto">Import a .cdnce file package from another machine or record any video in the AI Training Studio.</p>
+                <div className="flex justify-center gap-3 pt-2">
+                  <Button variant="secondary" size="sm" leadingIcon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>} onClick={() => { soundEngine.playClick(); cdnceFileInputRef.current?.click(); }}>
+                    Import .cdnce
+                  </Button>
+                  <Button variant="outlined" size="sm" leadingIcon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></svg>} onClick={() => { soundEngine.playClick(); onOpenTrainingStudio(); }}>
+                    Open Studio
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </motion.section>
 
       {/* Feature Bento Strip */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4">
+      <motion.section
+        className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.5 }}
+      >
         {/* Card 1: .cdnce Portability */}
-        <div
-          onClick={() => {
-            soundEngine.playClick();
-            cdnceFileInputRef.current?.click();
-          }}
-          className="p-5 rounded-2xl bg-[#120a26] border border-white/10 hover:border-amber-400/50 transition-all cursor-pointer shadow-lg space-y-2 group"
-        >
-          <div className="w-10 h-10 rounded-xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-300 text-lg group-hover:scale-110 transition-transform">
-            <i className="fa-solid fa-file-zipper"></i>
-          </div>
-          <div className="text-sm font-black text-white tracking-wide">
-            .cdnce Routine Sharing
-          </div>
-          <p className="text-xs text-white/60 leading-relaxed">
-            Export and import standalone .cdnce files containing the full original-resolution video and 17-point move coordinates.
-          </p>
-          <div className="pt-1 text-xs font-bold text-amber-300 flex items-center space-x-1">
-            <span>Import or Export Package</span>
-            <i className="fa-solid fa-arrow-right text-[10px] transform group-hover:translate-x-1 transition-transform"></i>
-          </div>
-        </div>
+        <Tooltip content="Export and import standalone .cdnce files containing the full original-resolution video and 17-point move coordinates" position="top">
+          <Card
+            variant="filled"
+            interactive
+            onClick={() => { soundEngine.playClick(); cdnceFileInputRef.current?.click(); }}
+            className="group h-full"
+            whileHover={{ y: -4, boxShadow: 'var(--shadow-level-3)' }}
+          >
+            <div className="w-12 h-12 rounded-xl bg-sun-500/15 border border-sun-500/30 flex items-center justify-center text-sun-400 text-xl group-hover:scale-110 transition-transform motion-spring">
+              <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+            </div>
+            <div className="mt-4">
+              <h3 className="text-title-medium font-black text-white tracking-wide">.cdnce Routine Sharing</h3>
+              <p className="text-body-small text-on-surface-variant leading-relaxed mt-2">Export and import standalone .cdnce files containing the full original-resolution video and 17-point move coordinates.</p>
+            </div>
+            <div className="mt-4 text-label-medium font-bold text-sun-400 flex items-center gap-1">
+              <span>Import or Export Package</span>
+              <motion.svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" initial={{ x: -4 }} animate={{ x: 0 }} transition={{ delay: 0.2 }}><polyline points="5 12 19 12" /><polyline points="13 5 19 12 13 19" /></motion.svg>
+            </div>
+          </Card>
+        </Tooltip>
 
         {/* Card 2: Training Studio */}
-        <div
-          onClick={() => {
-            soundEngine.playClick();
-            onOpenTrainingStudio();
-          }}
-          className="p-5 rounded-2xl bg-[#120a26] border border-white/10 hover:border-yellow-400/50 transition-all cursor-pointer shadow-lg space-y-2 group"
-        >
-          <div className="w-10 h-10 rounded-xl bg-yellow-400/10 border border-yellow-400/30 flex items-center justify-center text-yellow-300 text-lg group-hover:scale-110 transition-transform">
-            <i className="fa-solid fa-graduation-cap"></i>
-          </div>
-          <div className="text-sm font-black text-white tracking-wide">
-            AI Pose Extraction Studio
-          </div>
-          <p className="text-xs text-white/60 leading-relaxed">
-            Feed any MP4 routine to automatically extract 1 to 5 coach keypoint paths with precision trimming.
-          </p>
-          <div className="pt-1 text-xs font-bold text-yellow-300 flex items-center space-x-1">
-            <span>Launch Studio</span>
-            <i className="fa-solid fa-arrow-right text-[10px] transform group-hover:translate-x-1 transition-transform"></i>
-          </div>
-        </div>
+        <Tooltip content="Feed any MP4 routine to automatically extract 1 to 5 coach keypoint paths with precision trimming" position="top">
+          <Card
+            variant="filled"
+            interactive
+            onClick={() => { soundEngine.playClick(); onOpenTrainingStudio(); }}
+            className="group h-full"
+            whileHover={{ y: -4, boxShadow: 'var(--shadow-level-3)' }}
+          >
+            <div className="w-12 h-12 rounded-xl bg-accent-500/15 border border-accent-500/30 flex items-center justify-center text-accent-400 text-xl group-hover:scale-110 transition-transform motion-spring">
+              <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></svg>
+            </div>
+            <div className="mt-4">
+              <h3 className="text-title-medium font-black text-white tracking-wide">AI Pose Extraction Studio</h3>
+              <p className="text-body-small text-on-surface-variant leading-relaxed mt-2">Feed any MP4 routine to automatically extract 1 to 5 coach keypoint paths with precision trimming.</p>
+            </div>
+            <div className="mt-4 text-label-medium font-bold text-accent-400 flex items-center gap-1">
+              <span>Launch Studio</span>
+              <motion.svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" initial={{ x: -4 }} animate={{ x: 0 }} transition={{ delay: 0.2 }}><polyline points="5 12 19 12" /><polyline points="13 5 19 12 13 19" /></motion.svg>
+            </div>
+          </Card>
+        </Tooltip>
 
         {/* Card 3: Dynamic Multiplier */}
-        <div
-          onClick={() => {
-            soundEngine.playClick();
-            onNavigateToCatalog();
-          }}
-          className="p-5 rounded-2xl bg-[#120a26] border border-white/10 hover:border-pink-500/50 transition-all cursor-pointer shadow-lg space-y-2 group"
-        >
-          <div className="w-10 h-10 rounded-xl bg-pink-500/10 border border-pink-500/30 flex items-center justify-center text-pink-400 text-lg group-hover:scale-110 transition-transform">
-            <i className="fa-solid fa-gauge-high"></i>
-          </div>
-          <div className="text-sm font-black text-white tracking-wide">
-            Momentum Multiplier (4x Overdrive)
-          </div>
-          <p className="text-xs text-white/60 leading-relaxed">
-            Dance with high kinetic velocity to power up momentum and unlock ColeDance prestige ranks.
-          </p>
-          <div className="pt-1 text-xs font-bold text-pink-400 flex items-center space-x-1">
-            <span>View Song Library</span>
-            <i className="fa-solid fa-arrow-right text-[10px] transform group-hover:translate-x-1 transition-transform"></i>
-          </div>
-        </div>
-      </div>
-    </section>
+        <Tooltip content="Dance with high kinetic velocity to power up momentum and unlock ColeDance prestige ranks" position="top">
+          <Card
+            variant="filled"
+            interactive
+            onClick={() => { soundEngine.playClick(); onNavigateToCatalog(); }}
+            className="group h-full"
+            whileHover={{ y: -4, boxShadow: 'var(--shadow-level-3)' }}
+          >
+            <div className="w-12 h-12 rounded-xl bg-brand-500/15 border border-brand-500/30 flex items-center justify-center text-brand-400 text-xl group-hover:scale-110 transition-transform motion-spring">
+              <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
+            </div>
+            <div className="mt-4">
+              <h3 className="text-title-medium font-black text-white tracking-wide">Momentum Multiplier (4x Overdrive)</h3>
+              <p className="text-body-small text-on-surface-variant leading-relaxed mt-2">Dance with high kinetic velocity to power up momentum and unlock ColeDance prestige ranks.</p>
+            </div>
+            <div className="mt-4 text-label-medium font-bold text-brand-400 flex items-center gap-1">
+              <span>View Song Library</span>
+              <motion.svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" initial={{ x: -4 }} animate={{ x: 0 }} transition={{ delay: 0.2 }}><polyline points="5 12 19 12" /><polyline points="13 5 19 12 13 19" /></motion.svg>
+            </div>
+          </Card>
+        </Tooltip>
+      </motion.section>
+    </motion.section>
   );
 };
+
+export default HomeScreen;

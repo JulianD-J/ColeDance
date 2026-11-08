@@ -1,10 +1,31 @@
 import React, { useState, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Song, YoloCoachFrame, PoseKeyframe, Coach } from '../types/game';
 import { yoloTracker } from '../services/yoloPoseTracker';
 import { soundEngine } from '../services/soundEffects';
 import { saveCustomTrainedSong } from '../data/songsData';
 import { storeVideoBlob } from '../services/indexedDBStorage';
 import { exportCdncePackage, downloadCdnceBlob } from '../services/cdncePackageService';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  CardActions,
+  Button,
+  IconButton,
+  Input,
+  Select,
+  Badge,
+  Chip,
+  Progress,
+  Slider,
+  Switch,
+  Avatar,
+  Skeleton,
+  Tooltip,
+  Modal,
+} from './ui';
 
 interface TrainingStudioProps {
   onClose: () => void;
@@ -248,10 +269,10 @@ export const TrainingStudio: React.FC<TrainingStudioProps> = ({ onClose, onSongS
     // Build 1 to 5 coach profiles with individual names and routines
     const coaches: Coach[] = [];
     const colorGradients = [
-      'from-pink-600 via-purple-600 to-indigo-900',
-      'from-cyan-500 via-blue-600 to-purple-900',
-      'from-amber-500 via-rose-600 to-purple-900',
-      'from-emerald-500 via-teal-600 to-indigo-950',
+      'from-brand-500 via-purple-600 to-indigo-900',
+      'from-accent-500 via-blue-600 to-purple-900',
+      'from-sun-500 via-rose-600 to-purple-900',
+      'from-success-500 via-teal-600 to-indigo-950',
       'from-rose-500 via-purple-600 to-blue-900',
     ];
 
@@ -361,7 +382,7 @@ export const TrainingStudio: React.FC<TrainingStudioProps> = ({ onClose, onSongS
           avatarSeed: `Coach${idx}_${cName}`,
           routineName: `${cName} Choreo`,
           difficulty,
-          colorGradient: 'from-pink-500 via-purple-600 to-indigo-900',
+          colorGradient: 'from-brand-500 via-purple-600 to-indigo-900',
           coachIndex: idx,
         })),
         unlimitedCoachFrames: extractedCoachFrames,
@@ -407,383 +428,404 @@ export const TrainingStudio: React.FC<TrainingStudioProps> = ({ onClose, onSongS
     }
   };
 
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-lg p-4 select-none overflow-y-auto">
-      <div className="bg-[#0f0c2e] border-2 border-pink-500/60 rounded-3xl max-w-4xl w-full p-6 space-y-5 shadow-[0_0_60px_rgba(255,20,147,0.5)] my-auto text-white">
-        {/* Top Header */}
-        <div className="flex justify-between items-center pb-3 border-b border-white/10">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-pink-500 to-purple-600 flex items-center justify-center text-lg shadow-lg">
-              <i className="fa-solid fa-graduation-cap text-yellow-300"></i>
-            </div>
-            <div>
-              <h2 className="text-xl font-black italic tracking-wider text-white">
-                COLEDANCE COACH CHOREOGRAPHY STUDIO
-              </h2>
-              <p className="text-[11px] text-white/60">
-                Record exact 17-keypoint trajectories for 1 to 5 coaches via YOLOv8/11 pose estimation
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => {
-              soundEngine.playClick();
-              onClose();
-            }}
-            className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-sm cursor-pointer"
-          >
-            <i className="fa-solid fa-xmark"></i>
-          </button>
+    <Modal
+      isOpen={true}
+      onClose={() => { soundEngine.playClick(); onClose(); }}
+      title="COLEDANCE COACH CHOREOGRAPHY STUDIO"
+      description="Record exact 17-keypoint trajectories for 1 to 5 coaches via YOLOv8/11 pose estimation"
+      size="max"
+      variant="form"
+      showCloseButton={true}
+      footer={
+        <div className="w-full flex justify-end gap-3">
+          <Button variant="outlined" onClick={() => { soundEngine.playClick(); onClose(); }}>Cancel</Button>
+          <Button variant="primary" size="lg" onClick={handleSaveSong} className="shadow-brand-glow">
+            SAVE {detectedCoachCount} COACH(ES) TO SONG LIST
+          </Button>
         </div>
-
+      }
+    >
+      <motion.div
+        className="space-y-6"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+      >
         {/* Visualizer & Mode Status Bar */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-black/50 p-3 rounded-2xl border border-white/10">
-          <div className="p-2.5 rounded-xl border bg-gradient-to-r from-pink-600/40 to-purple-600/40 border-pink-400 flex items-center justify-between">
-            <div className="flex items-center space-x-2.5">
-              <i className="fa-solid fa-person-running text-lg text-yellow-300"></i>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card variant="filled" padding="md" className="bg-gradient-to-r from-brand-500/20 to-purple-500/20 border-brand-500/30">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-brand-500/20 flex items-center justify-center text-brand-400">
+                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></svg>
+              </div>
               <div>
-                <div className="text-xs font-black italic uppercase text-yellow-300">
-                  EXACT COACH MOVES MODE (ACTIVE)
-                </div>
-                <div className="text-[10px] text-white/70">
-                  Direct frame-by-frame joint comparison against coach
-                </div>
+                <div className="text-label-large font-black italic uppercase text-brand-400">EXACT COACH MOVES MODE</div>
+                <div className="text-body-small text-on-surface-variant">Direct frame-by-frame joint comparison against coach</div>
               </div>
             </div>
-            <span className="w-5 h-5 rounded-full bg-yellow-300 flex items-center justify-center">
-              <i className="fa-solid fa-check text-[10px] text-black font-black"></i>
-            </span>
-          </div>
+          </Card>
 
-          {/* Toggle YOLO Visualizer */}
-          <button
-            onClick={() => {
-              soundEngine.playClick();
-              setShowYoloVisualizer((prev) => !prev);
-              yoloTracker.setShowYoloDebugOverlay(!showYoloVisualizer);
-            }}
-            className={`p-2.5 rounded-xl border flex items-center justify-between transition cursor-pointer ${
-              showYoloVisualizer
-                ? 'bg-gradient-to-r from-cyan-600 to-blue-600 border-cyan-300 shadow-lg'
-                : 'bg-white/5 border-white/10'
-            }`}
-          >
-            <div className="flex items-center space-x-2.5 text-left">
-              <i className="fa-solid fa-radar text-lg text-cyan-300"></i>
-              <div>
-                <div className="text-xs font-black italic uppercase">
-                  YOLO MAP & DETECT OVERLAY: {showYoloVisualizer ? 'VISIBLE' : 'HIDDEN'}
-                </div>
-                <div className="text-[10px] text-white/70">
-                  Visualizes YOLOv8/11 bounding boxes & 17 COCO keypoints
-                </div>
-              </div>
+          <Card variant="filled" padding="md" className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Tooltip content={showYoloVisualizer ? 'Hide YOLO detection overlay' : 'Show YOLO detection overlay'} position="top">
+                <Button
+                  variant={showYoloVisualizer ? 'secondary' : 'ghost'}
+                  size="sm"
+                  leadingIcon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg>}
+                  onClick={() => {
+                    soundEngine.playClick();
+                    setShowYoloVisualizer((prev) => !prev);
+                    yoloTracker.setShowYoloDebugOverlay(!showYoloVisualizer);
+                  }}
+                >
+                  YOLO MAP & DETECT: {showYoloVisualizer ? 'VISIBLE' : 'HIDDEN'}
+                </Button>
+              </Tooltip>
             </div>
-            <span
-              className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                showYoloVisualizer ? 'bg-cyan-300 border-white' : 'border-white/30'
-              }`}
-            >
-              {showYoloVisualizer && <i className="fa-solid fa-check text-[10px] text-black font-black"></i>}
-            </span>
-          </button>
+          </Card>
         </div>
 
         {/* Main Columns */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left Column: Video & YOLO Visualizer Preview */}
-          <div className="space-y-4">
-            <div className="relative w-full h-56 bg-black/80 rounded-2xl overflow-hidden border border-white/15 flex items-center justify-center">
-              {videoSrc ? (
-                <>
-                  <video
-                    ref={videoRef}
-                    src={videoSrc}
-                    controls
-                    playsInline
-                    onLoadedMetadata={() => {
-                      if (videoRef.current) {
-                        const dur = Math.round(videoRef.current.duration || 0);
-                        setRawVideoDuration(dur);
-                        setTrimStart(0);
-                        setTrimEnd(dur);
-                      }
-                    }}
-                    className="w-full h-full object-contain"
-                  />
-                  <canvas
-                    ref={canvasRef}
-                    width={480}
-                    height={270}
-                    className="absolute inset-0 w-full h-full pointer-events-none"
-                  />
-                </>
-              ) : (
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="text-center p-6 space-y-2 cursor-pointer hover:text-pink-400 transition"
-                >
-                  <i className="fa-solid fa-cloud-arrow-up text-4xl text-pink-500 animate-bounce"></i>
-                  <div className="text-xs font-black uppercase tracking-wider">
-                    CLICK TO UPLOAD COACH VIDEO (MP4/WEBM)
-                  </div>
-                  <div className="text-[10px] text-white/50">Video stays 100% local on your device</div>
-                </div>
-              )}
-            </div>
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="video/*"
-              className="hidden"
-              onChange={handleVideoUpload}
-            />
-
-            {/* Video Trimmer Controls (Cut YouTube Intro & Outro Menus) */}
-            {videoSrc && rawVideoDuration > 0 && (
-              <div className="bg-black/60 p-3 rounded-2xl border border-white/10 space-y-2.5">
-                <div className="flex justify-between items-center text-xs font-bold">
-                  <span className="text-white/70">
-                    Full Video: {Math.floor(rawVideoDuration / 60)}m {rawVideoDuration % 60}s ({rawVideoDuration}s)
-                  </span>
-                  <span className="text-pink-400 font-black">
-                    Routine Trim: {Math.floor(Math.max(0, trimEnd - trimStart) / 60)}m {Math.max(0, trimEnd - trimStart) % 60}s ({(trimEnd - trimStart).toFixed(0)}s)
-                  </span>
-                </div>
-
-                <div className="space-y-1">
-                  <div className="flex justify-between text-[10px] text-white/60">
-                    <span>Start: {trimStart}s</span>
-                    <span>End: {trimEnd}s</span>
-                  </div>
-                  <div className="flex space-x-2">
-                    <input
-                      type="range"
-                      min="0"
-                      max={rawVideoDuration}
-                      value={trimStart}
-                      onChange={(e) => {
-                        const v = Math.min(parseFloat(e.target.value), trimEnd - 2);
-                        setTrimStart(v);
-                        if (videoRef.current) videoRef.current.currentTime = v;
+          <div className="space-y-5 lg:space-y-6">
+            {/* Video Player with Canvas Overlay */}
+            <Card variant="filled" padding="none" className="overflow-hidden">
+              <div className="relative w-full aspect-video bg-surface-0">
+                {videoSrc ? (
+                  <>
+                    <video
+                      ref={videoRef}
+                      src={videoSrc}
+                      controls
+                      playsInline
+                      onLoadedMetadata={() => {
+                        if (videoRef.current) {
+                          const dur = Math.round(videoRef.current.duration || 0);
+                          setRawVideoDuration(dur);
+                          setTrimStart(0);
+                          setTrimEnd(dur);
+                        }
                       }}
-                      className="w-full accent-pink-500 cursor-pointer"
+                      className="w-full h-full object-contain"
                     />
-                    <input
-                      type="range"
-                      min="0"
-                      max={rawVideoDuration}
-                      value={trimEnd}
-                      onChange={(e) => {
-                        const v = Math.max(parseFloat(e.target.value), trimStart + 2);
-                        setTrimEnd(v);
-                        if (videoRef.current) videoRef.current.currentTime = v;
-                      }}
-                      className="w-full accent-cyan-400 cursor-pointer"
+                    <canvas
+                      ref={canvasRef}
+                      className="absolute inset-0 w-full h-full pointer-events-none"
                     />
-                  </div>
-                </div>
-
-                <div className="flex space-x-2 pt-0.5 text-[11px]">
-                  <button
-                    onClick={() => {
-                      soundEngine.playClick();
-                      if (videoRef.current) {
-                        const cur = Math.floor(videoRef.current.currentTime);
-                        setTrimStart(Math.min(cur, trimEnd - 1));
-                      }
-                    }}
-                    className="flex-1 py-1.5 bg-white/10 hover:bg-pink-600/70 rounded-lg text-white font-bold transition cursor-pointer"
-                  >
-                    [ [ Set Start ({trimStart}s)
-                  </button>
-                  <button
-                    onClick={() => {
-                      soundEngine.playClick();
-                      if (videoRef.current) {
-                        const cur = Math.ceil(videoRef.current.currentTime);
-                        setTrimEnd(Math.max(cur, trimStart + 1));
-                      }
-                    }}
-                    className="flex-1 py-1.5 bg-white/10 hover:bg-cyan-600/70 rounded-lg text-white font-bold transition cursor-pointer"
-                  >
-                    Set End ({trimEnd}s) ] ]
-                  </button>
-                  <button
-                    onClick={() => {
-                      soundEngine.playClick();
-                      setTrimStart(0);
-                      setTrimEnd(rawVideoDuration);
-                    }}
-                    className="px-3 py-1.5 bg-white/5 hover:bg-white/15 rounded-lg text-white/60 hover:text-white font-bold transition cursor-pointer"
-                  >
-                    Full
-                  </button>
-                </div>
+                  </>
+                ) : (
+                  <Tooltip content="Click to upload coach video (MP4/WebM)" position="top">
+                    <motion.div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full h-full flex flex-col items-center justify-center gap-4 p-8 cursor-pointer"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      <motion.div
+                        className="w-20 h-20 rounded-2xl bg-brand-500/15 border border-brand-500/30 flex items-center justify-center text-brand-400 text-3xl"
+                        initial={{ scale: 0 }}
+                        animate={{ scale: [1, 1.1, 1] }}
+                        transition={{ type: 'spring', stiffness: 500, damping: 17, duration: 2, repeat: Infinity }}
+                      >
+                        <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+                      </motion.div>
+                      <div className="text-center">
+                        <div className="text-label-large font-black uppercase text-brand-400 tracking-wider">CLICK TO UPLOAD COACH VIDEO</div>
+                        <div className="text-body-small text-on-surface-variant mt-1">MP4, WebM • Video stays 100% local on your device</div>
+                      </div>
+                    </motion.div>
+                  </Tooltip>
+                )}
               </div>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="video/*"
+                className="hidden"
+                onChange={handleVideoUpload}
+              />
+            </Card>
+
+            {/* Video Trimmer Controls */}
+            {videoSrc && rawVideoDuration > 0 && (
+              <Card variant="filled" padding="md" className="space-y-4">
+                <CardHeader>
+                  <CardTitle level="h4">VIDEO TRIMMER</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex justify-between items-center text-body-small font-semibold">
+                    <span className="text-on-surface-variant">Full Video: {formatTime(rawVideoDuration)} ({rawVideoDuration}s)</span>
+                    <span className="text-brand-400">Routine Trim: {formatTime(Math.max(0, trimEnd - trimStart))} ({(trimEnd - trimStart).toFixed(0)}s)</span>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-label-small text-on-surface-disabled">
+                      <span>Start: {formatTime(trimStart)}</span>
+                      <span>End: {formatTime(trimEnd)}</span>
+                    </div>
+                    <div className="flex gap-3">
+                      <input
+                        type="range"
+                        min="0"
+                        max={rawVideoDuration}
+                        value={trimStart}
+                        onChange={(e) => {
+                          const v = Math.min(parseFloat(e.target.value), trimEnd - 2);
+                          setTrimStart(v);
+                          if (videoRef.current) videoRef.current.currentTime = v;
+                        }}
+                        className="flex-1 accent-brand-500 h-2"
+                      />
+                      <input
+                        type="range"
+                        min="0"
+                        max={rawVideoDuration}
+                        value={trimEnd}
+                        onChange={(e) => {
+                          const v = Math.max(parseFloat(e.target.value), trimStart + 2);
+                          setTrimEnd(v);
+                          if (videoRef.current) videoRef.current.currentTime = v;
+                        }}
+                        className="flex-1 accent-accent-500 h-2"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      variant="outlined"
+                      size="sm"
+                      onClick={() => {
+                        soundEngine.playClick();
+                        if (videoRef.current) {
+                          const cur = Math.floor(videoRef.current.currentTime);
+                          setTrimStart(Math.min(cur, trimEnd - 1));
+                        }
+                      }}
+                    >
+                      [[ Set Start ({formatTime(trimStart)})
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        soundEngine.playClick();
+                        if (videoRef.current) {
+                          const cur = Math.ceil(videoRef.current.currentTime);
+                          setTrimEnd(Math.max(cur, trimStart + 1));
+                        }
+                      }}
+                    >
+                      Set End ({formatTime(trimEnd)}) ]]
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => { soundEngine.playClick(); setTrimStart(0); setTrimEnd(rawVideoDuration); }}>
+                      Full Video
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             )}
 
             {/* Scan Action */}
             {videoSrc && (
-              <div className="space-y-2">
-                <div className="flex space-x-2">
-                  <button
-                    onClick={handleStartScan}
-                    disabled={isScanning}
-                    className="flex-1 py-3 bg-gradient-to-r from-pink-500 to-purple-600 hover:scale-105 active:scale-95 disabled:opacity-50 transition font-black italic text-xs rounded-xl shadow-lg flex items-center justify-center space-x-2 border border-white/20 cursor-pointer"
-                  >
-                    <i className="fa-solid fa-brain"></i>
-                    <span>
-                      {isScanning
-                        ? `RECORDING POSES... (${scanProgress}%)`
-                        : 'RECORD EXACT COACH POSES VIA YOLOV8/11'}
-                    </span>
-                  </button>
+              <Card variant="filled" padding="md" className="space-y-4">
+                <CardHeader>
+                  <CardTitle level="h4">YOLO POSE EXTRACTION</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex gap-3">
+                    <Tooltip content="Start recording exact coach poses via YOLOv8/11" position="top">
+                      <Button
+                        variant="primary"
+                        size="lg"
+                        fullWidth
+                        leadingIcon={<svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a10 10 0 0 1 10 10A10 10 0 0 1 12 22 10 10 0 0 1 2 12 10 10 0 0 1 12 2" /><path d="M12 6v6l4 2" /></svg>}
+                        disabled={isScanning}
+                        onClick={handleStartScan}
+                        className="shadow-brand-glow"
+                      >
+                        {isScanning ? `RECORDING POSES... (${scanProgress}%)` : 'RECORD EXACT COACH POSES VIA YOLOv8/11'}
+                      </Button>
+                    </Tooltip>
 
-                  <button
-                    onClick={handleCaptureVideoFrame}
-                    title="Capture current video frame as miniature thumbnail"
-                    className="px-4 py-3 bg-indigo-900/80 hover:bg-indigo-800 border border-white/20 rounded-xl text-xs font-bold cursor-pointer flex items-center space-x-1"
-                  >
-                    <i className="fa-solid fa-camera"></i>
-                    <span>SNAP THUMBNAIL</span>
-                  </button>
-                </div>
-
-                {isScanning && (
-                  <div className="w-full bg-black/60 rounded-full h-2 overflow-hidden border border-white/10">
-                    <div
-                      className="bg-gradient-to-r from-pink-500 via-yellow-300 to-cyan-400 h-full transition-all duration-100"
-                      style={{ width: `${scanProgress}%` }}
-                    ></div>
+                    <Tooltip content="Capture current video frame as miniature thumbnail" position="top">
+                      <Button
+                        variant="outlined"
+                        size="lg"
+                        leadingIcon={<svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>}
+                        onClick={handleCaptureVideoFrame}
+                      >
+                        SNAP THUMBNAIL
+                      </Button>
+                    </Tooltip>
                   </div>
-                )}
-              </div>
+
+                  {isScanning && (
+                    <Progress value={scanProgress} size="lg" variant="gradient" animated striped showLabel />
+                  )}
+
+                  {extractedCoachFrames.length > 0 && !isScanning && (
+                    <div className="p-3 rounded-xl bg-success-500/15 border border-success-500/30">
+                      <div className="flex items-center gap-2 text-success-400 font-semibold">
+                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+                        <span>✓ {extractedCoachFrames.length} joint frames recorded for {detectedCoachCount} coach(es)</span>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             )}
 
             {/* Coach Count Configuration (1 to 5 coaches) */}
-            <div className="bg-black/50 p-3 rounded-2xl border border-white/10 space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-[10px] font-black uppercase text-cyan-400">
-                  COACHES DETECTED IN VIDEO:
-                </span>
-                <div className="flex space-x-1.5">
-                  {[1, 2, 3, 4, 5].map((cnt) => (
-                    <button
-                      key={cnt}
-                      type="button"
-                      onClick={() => setDetectedCoachCount(cnt)}
-                      className={`w-7 h-7 rounded-lg text-xs font-black border transition cursor-pointer ${
-                        detectedCoachCount === cnt
-                          ? 'bg-pink-600 text-white border-white shadow-[0_0_10px_#ff1493]'
-                          : 'bg-white/10 text-white/60 border-white/15 hover:border-pink-400'
-                      }`}
+            <Card variant="filled" padding="md" className="space-y-4">
+              <CardHeader>
+                <CardTitle level="h4">COACH CONFIGURATION</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-label-small font-black uppercase text-accent-400 tracking-wider">COACHES IN ROUTINE:</span>
+                  <div className="flex gap-2">
+                    {[1, 2, 3, 4, 5].map((cnt) => (
+                      <Tooltip key={cnt} content={`${cnt} Coach${cnt > 1 ? 'es' : ''}`} position="top">
+                        <motion.button
+                          type="button"
+                          onClick={() => { soundEngine.playClick(); setDetectedCoachCount(cnt); }}
+                          className={`
+                            w-12 h-12 rounded-xl text-label-large font-black border transition-all motion-spring
+                            ${detectedCoachCount === cnt
+                              ? 'bg-gradient-to-r from-brand-500 to-brand-600 text-white shadow-brand-glow border-transparent'
+                              : 'bg-surface-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-3 hover:border-brand-500'
+                            }
+                          `}
+                          whileTap={{ scale: 0.9 }}
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: 0.05 * cnt, type: 'spring', stiffness: 500, damping: 17 }}
+                        >
+                          {cnt}
+                        </motion.button>
+                      </Tooltip>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Coach Custom Names for 1-5 Coaches */}
+                <div className="space-y-3 pt-2 border-t border-outline-variant">
+                  {Array.from({ length: detectedCoachCount }).map((_, cIdx) => (
+                    <motion.div
+                      key={cIdx}
+                      className="flex items-center gap-3"
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.05 * cIdx }}
                     >
-                      {cnt}
-                    </button>
+                      <span className="text-label-small font-bold text-on-surface-variant w-24 shrink-0">Coach {cIdx + 1}:</span>
+                      <Input
+                        value={coachCustomNames[cIdx] || `Coach ${cIdx + 1}`}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setCoachCustomNames((prev) => {
+                            const copy = [...prev];
+                            copy[cIdx] = val;
+                            return copy;
+                          });
+                        }}
+                        placeholder={`Name for Coach ${cIdx + 1}`}
+                        size="md"
+                        fullWidth
+                      />
+                    </motion.div>
                   ))}
                 </div>
-              </div>
-
-              {/* Coach Custom Names for 1-5 Coaches */}
-              <div className="space-y-1.5 pt-1">
-                {Array.from({ length: detectedCoachCount }).map((_, cIdx) => (
-                  <div key={cIdx} className="flex items-center space-x-2">
-                    <span className="text-[10px] font-bold text-white/70 w-16">
-                      Coach {cIdx + 1}:
-                    </span>
-                    <input
-                      type="text"
-                      value={coachCustomNames[cIdx] || `Coach ${cIdx + 1}`}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setCoachCustomNames((prev) => {
-                          const copy = [...prev];
-                          copy[cIdx] = val;
-                          return copy;
-                        });
-                      }}
-                      className="flex-1 px-2.5 py-1 bg-black/60 border border-white/20 rounded-lg text-xs font-semibold text-white focus:outline-none focus:border-pink-500"
-                      placeholder={`Name for Coach ${cIdx + 1}`}
-                    />
-                  </div>
-                ))}
-              </div>
-
-              {extractedCoachFrames.length > 0 && (
-                <div className="text-[10px] text-emerald-400 font-bold pt-1">
-                  ✓ {extractedCoachFrames.length} joint frames recorded for {detectedCoachCount} coach(es)
-                </div>
-              )}
-            </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Right Column: Song Metadata & Miniature */}
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-[10px] font-black uppercase text-pink-400">Song Title</label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. Levitate Dance"
-                  className="w-full px-3 py-2 bg-black/60 border border-white/20 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-pink-500"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-black uppercase text-pink-400">Artist Name</label>
-                <input
-                  type="text"
-                  value={artist}
-                  onChange={(e) => setArtist(e.target.value)}
-                  placeholder="e.g. Custom Artist"
-                  className="w-full px-3 py-2 bg-black/60 border border-white/20 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-pink-500"
-                />
-              </div>
-            </div>
+          <div className="space-y-5 lg:space-y-6">
+            {/* Song Metadata */}
+            <Card variant="filled" padding="lg" className="space-y-5">
+              <CardHeader>
+                <CardTitle level="h4">ROUTINE METADATA</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Input
+                    label="Song Title"
+                    placeholder="e.g. Levitate Dance"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    size="md"
+                  />
+                  <Input
+                    label="Artist Name"
+                    placeholder="e.g. Custom Artist"
+                    value={artist}
+                    onChange={(e) => setArtist(e.target.value)}
+                    size="md"
+                  />
+                </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-[10px] font-black uppercase text-pink-400">Difficulty</label>
-                <select
-                  value={difficulty}
-                  onChange={(e) => setDifficulty(e.target.value as any)}
-                  className="w-full px-3 py-2 bg-black/60 border border-white/20 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-pink-500 cursor-pointer"
-                >
-                  <option value="Easy">Easy (1 Bar)</option>
-                  <option value="Medium">Medium (2 Bars)</option>
-                  <option value="Hard">Hard (3 Bars)</option>
-                  <option value="Extreme">Extreme (4 Bars)</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-[10px] font-black uppercase text-pink-400">BPM / Tempo</label>
-                <input
-                  type="number"
-                  value={bpm}
-                  onChange={(e) => setBpm(Number(e.target.value))}
-                  className="w-full px-3 py-2 bg-black/60 border border-white/20 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-pink-500"
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Select
+                    label="Difficulty"
+                    value={difficulty}
+                    options={[
+                      { value: 'Easy', label: 'Easy (1 Bar)' },
+                      { value: 'Medium', label: 'Medium (2 Bars)' },
+                      { value: 'Hard', label: 'Hard (3 Bars)' },
+                      { value: 'Extreme', label: 'Extreme (4 Bars)' },
+                    ]}
+                    onChange={(e) => setDifficulty(e.target.value as any)}
+                    size="md"
+                  />
+                  <Input
+                    label="BPM / Tempo"
+                    type="number"
+                    value={String(bpm)}
+                    onChange={(e) => setBpm(Number(e.target.value))}
+                    size="md"
+                  />
+                </div>
+
+                <Select
+                  label="Genre"
+                  value={genre}
+                  options={[
+                    { value: 'Pop', label: 'Pop' },
+                    { value: 'K-Pop', label: 'K-Pop' },
+                    { value: 'Electro-Dance', label: 'Electro-Dance' },
+                    { value: 'Hip-Hop', label: 'Hip-Hop' },
+                    { value: 'Rock', label: 'Rock' },
+                    { value: 'EDM', label: 'EDM' },
+                  ]}
+                  onChange={(e) => setGenre(e.target.value)}
+                  size="md"
                 />
-              </div>
-            </div>
+              </CardContent>
+            </Card>
 
             {/* Miniature Input */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between items-center">
-                <label className="text-[10px] font-black uppercase text-pink-400">
-                  Miniature Thumbnail (Fills Catalog Space)
-                </label>
-                <button
-                  type="button"
-                  onClick={() => imageInputRef.current?.click()}
-                  className="text-[10px] text-cyan-400 hover:underline cursor-pointer font-bold"
-                >
-                  Upload Image
-                </button>
-              </div>
-
+            <Card variant="filled" padding="lg" className="space-y-4">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle level="h4">MINIATURE THUMBNAIL</CardTitle>
+                  <Tooltip content="Upload custom thumbnail image" position="top">
+                    <Button variant="ghost" size="sm" onClick={() => imageInputRef.current?.click()}>
+                      UPLOAD IMAGE
+                    </Button>
+                  </Tooltip>
+                </div>
+              </CardHeader>
               <input
                 ref={imageInputRef}
                 type="file"
@@ -791,82 +833,88 @@ export const TrainingStudio: React.FC<TrainingStudioProps> = ({ onClose, onSongS
                 className="hidden"
                 onChange={handleMiniatureUpload}
               />
-
-              <div className="flex items-center space-x-3 bg-black/40 p-2.5 rounded-xl border border-white/10">
-                <div className="w-24 h-16 rounded-lg overflow-hidden bg-slate-800 border border-white/20 relative flex-shrink-0">
-                  {miniatureSrc ? (
-                    <img src={miniatureSrc} alt="Miniature" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-[9px] text-white/40 text-center p-1">
-                      No Thumbnail
-                    </div>
-                  )}
+              <CardContent>
+                <div className="flex items-center gap-4">
+                  <div className="relative w-32 h-20 md:w-40 md:h-24 rounded-xl overflow-hidden bg-surface-2 border border-outline-variant flex-shrink-0">
+                    {miniatureSrc ? (
+                      <img src={miniatureSrc} alt="Miniature" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-body-small text-on-surface-variant">
+                        <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
+                        <span>No Thumbnail</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-white truncate">{title || 'Untitled Routine'}</div>
+                    <div className="text-body-small text-on-surface-variant">Use "Snap Thumbnail" from video or upload a custom image.</div>
+                    <div className="text-label-small text-accent-400 mt-1">Recommended: 16:9 aspect ratio, 640x360px</div>
+                  </div>
                 </div>
-                <div className="text-[11px] text-white/70 space-y-1">
-                  <div className="font-bold text-white">{title || 'Untitled Routine'}</div>
-                  <div>Use "Snap Thumbnail" from video or upload a custom image.</div>
+              </CardContent>
+            </Card>
+
+            {/* Export Actions */}
+            <Card variant="filled" padding="lg" className="space-y-4">
+              <CardHeader>
+                <CardTitle level="h4">EXPORT & SHARE</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Tooltip content="Export routine as a standalone .cdnce zip containing the full-resolution video and move trajectories" position="top">
+                  <Button
+                    variant="secondary"
+                    size="lg"
+                    fullWidth
+                    leadingIcon={<svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>}
+                    disabled={isExportingCdnce || !videoFileBlob}
+                    onClick={handleExportCdnce}
+                    className="shadow-sun-glow"
+                  >
+                    {isExportingCdnce ? 'PACKAGING .CDNCE...' : 'EXPORT .CDNCE PACKAGE (VIDEO + MOVES)'}
+                  </Button>
+                </Tooltip>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Tooltip content="Export pose data as JSON" position="top">
+                    <Button variant="outlined" fullWidth leadingIcon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>} onClick={handleExportJSON}>
+                      EXPORT MOVES JSON
+                    </Button>
+                  </Tooltip>
+                  <Tooltip content="Import pose data from JSON" position="top">
+                    <Button variant="ghost" fullWidth onClick={() => jsonImportRef.current?.click()}>
+                      IMPORT MOVES JSON
+                    </Button>
+                  </Tooltip>
+                  <input
+                    ref={jsonImportRef}
+                    type="file"
+                    accept=".json"
+                    className="hidden"
+                    onChange={handleImportJSON}
+                  />
                 </div>
-              </div>
-            </div>
-
-            {/* .cdnce Package Export (Single file with original video + moves) */}
-            <div className="pt-1">
-              <button
-                onClick={handleExportCdnce}
-                disabled={isExportingCdnce}
-                className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-black font-black text-xs uppercase tracking-wider rounded-xl transition flex items-center justify-center space-x-2 shadow-lg cursor-pointer border border-amber-300"
-                title="Export routine as a standalone .cdnce zip containing the full-resolution video and move trajectories"
-              >
-                <i className={`fa-solid ${isExportingCdnce ? 'fa-spinner animate-spin' : 'fa-file-zipper'} text-sm`}></i>
-                <span>{isExportingCdnce ? 'PACKAGING .CDNCE...' : 'EXPORT .CDNCE PACKAGE (VIDEO + MOVES)'}</span>
-              </button>
-            </div>
-
-            {/* JSON Export & Import */}
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={handleExportJSON}
-                className="flex-1 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 cursor-pointer"
-              >
-                <i className="fa-solid fa-download text-yellow-300"></i>
-                <span>EXPORT MOVES JSON</span>
-              </button>
-
-              <button
-                onClick={() => jsonImportRef.current?.click()}
-                className="flex-1 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 cursor-pointer"
-              >
-                <i className="fa-solid fa-upload text-cyan-300"></i>
-                <span>IMPORT MOVES JSON</span>
-              </button>
-
-              <input
-                ref={jsonImportRef}
-                type="file"
-                accept=".json"
-                className="hidden"
-                onChange={handleImportJSON}
-              />
-            </div>
-
-            {/* Save Button */}
-            <button
-              onClick={handleSaveSong}
-              className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:scale-105 active:scale-95 transition font-black italic text-sm rounded-xl shadow-xl flex items-center justify-center space-x-2 border border-white/30 cursor-pointer"
-            >
-              <i className="fa-solid fa-floppy-disk"></i>
-              <span>SAVE {detectedCoachCount} COACH(ES) TO SONG LIST</span>
-            </button>
+              </CardContent>
+            </Card>
           </div>
         </div>
 
         {/* Live Status Message Bar */}
-        {statusMessage && (
-          <div className="text-center text-xs font-bold text-yellow-300 bg-yellow-950/60 p-2.5 rounded-xl border border-yellow-500/30">
-            {statusMessage}
-          </div>
-        )}
-      </div>
-    </div>
+        <AnimatePresence>
+          {statusMessage && (
+            <motion.div
+              className="p-4 rounded-2xl bg-sun-900/40 border border-sun-500/30 text-center"
+              initial={{ opacity: 0, height: 0, y: -10 }}
+              animate={{ opacity: 1, height: 'auto', y: 0 }}
+              exit={{ opacity: 0, height: 0, y: -10 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+            >
+              <p className="text-body-small font-bold text-sun-400">{statusMessage}</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </Modal>
   );
 };
+
+export default TrainingStudio;

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ScreenId, Song, Coach, Player } from './types/game';
-import { getAllSongs, deleteCustomTrainedSong } from './data/songsData';
+import { getAllSongs, deleteCustomTrainedSong, clearAllCustomSongs } from './data/songsData';
 import { Header } from './components/Header';
 import { RightPartyPanel } from './components/RightPartyPanel';
 import { HomeScreen } from './components/HomeScreen';
@@ -227,8 +227,8 @@ export default function App() {
     setActiveScreen('coaches');
   };
 
-  const handleDeleteSong = (songId: string) => {
-    deleteCustomTrainedSong(songId);
+  const handleDeleteSong = async (songId: string) => {
+    await deleteCustomTrainedSong(songId);
     const updated = getAllSongs();
     setSongsList(updated);
     if (selectedSong?.id === songId) {
@@ -241,8 +241,8 @@ export default function App() {
     setPlayers((prev) => [updatedPrimaryPlayer, ...prev.slice(1)]);
   };
 
-  const handleResetLibrary = () => {
-    localStorage.removeItem('coledance_custom_trained_songs_v3');
+  const handleResetLibrary = async () => {
+    await clearAllCustomSongs();
     const updated = getAllSongs();
     setSongsList(updated);
     setSelectedSong(updated[0] || null);
@@ -250,7 +250,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen text-white relative font-sans flex flex-col justify-between p-2 md:p-4 select-none bg-[#070312] bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(160,32,140,0.2),rgba(0,0,0,0))]">
+    <div className="min-h-screen text-white relative font-sans flex flex-col justify-between p-2 md:p-4 select-none bg-surface-0 bg-radial-vignette">
       {/* Top Header Bar (Unified Primary Navigation - Single authoritative bar) */}
       {activeScreen !== 'gameplay' && (
         <div className="w-full lg:pr-16">

@@ -1,7 +1,23 @@
 import React, { useState, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Song, Player } from '../types/game';
 import { soundEngine } from '../services/soundEffects';
 import { exportCdncePackage, downloadCdnceBlob, importCdncePackage } from '../services/cdncePackageService';
+import {
+  Card,
+  CardMedia,
+  CardContent,
+  CardActions,
+  Button,
+  IconButton,
+  Badge,
+  Chip,
+  Input,
+  Select,
+  Avatar,
+  Skeleton,
+  Tooltip,
+} from './ui';
 
 interface SongsCatalogScreenProps {
   songs: Song[];
@@ -11,6 +27,36 @@ interface SongsCatalogScreenProps {
   onDeleteSong?: (songId: string) => void;
   onSongImported?: (song: Song) => void;
 }
+
+const letterTabs = ['ALL', 'A-E', 'F-J', 'K-O', 'P-T', 'U-Z'];
+
+const difficultyOptions = [
+  { value: 'ALL', label: 'All' },
+  { value: 'Easy', label: 'Easy' },
+  { value: 'Medium', label: 'Medium' },
+  { value: 'Hard', label: 'Hard' },
+  { value: 'Extreme', label: 'Extreme' },
+];
+
+const genreOptions = [
+  { value: 'ALL', label: 'All Genres' },
+  { value: 'Pop', label: 'Pop' },
+  { value: 'K-Pop', label: 'K-Pop' },
+  { value: 'Electro-Dance', label: 'Electro-Dance' },
+];
+
+const moodOptions = [
+  { value: 'ALL', label: 'All Moods' },
+  { value: 'Party', label: 'Party' },
+  { value: 'Cyber', label: 'Cyber' },
+  { value: 'Energetic', label: 'Energetic' },
+];
+
+const sortOptions = [
+  { value: 'A-Z', label: 'Alphabetically (A to Z)' },
+  { value: 'DIFF', label: 'By Difficulty' },
+  { value: 'BPM', label: 'By BPM Tempo' },
+];
 
 export const SongsCatalogScreen: React.FC<SongsCatalogScreenProps> = ({
   songs,
@@ -22,9 +68,9 @@ export const SongsCatalogScreen: React.FC<SongsCatalogScreenProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedLetterTab, setSelectedLetterTab] = useState('ALL');
-  const [selectedGenre, setSelectedGenre] = useState<string>('ALL');
-  const [selectedDiff, setSelectedDiff] = useState<string>('ALL');
-  const [selectedMood, setSelectedMood] = useState<string>('ALL');
+  const [selectedGenre, setSelectedGenre] = useState('ALL');
+  const [selectedDiff, setSelectedDiff] = useState('ALL');
+  const [selectedMood, setSelectedMood] = useState('ALL');
   const [sortOrder, setSortOrder] = useState<'A-Z' | 'DIFF' | 'BPM'>('A-Z');
   const [expandedAccordion, setExpandedAccordion] = useState<string | null>('GENRES');
   const [hoveredSongId, setHoveredSongId] = useState<string | null>(null);
@@ -69,9 +115,6 @@ export const SongsCatalogScreen: React.FC<SongsCatalogScreenProps> = ({
       if (e.target) e.target.value = '';
     }
   };
-
-  // Alphabetical ranges
-  const letterTabs = ['ALL', 'A-E', 'F-J', 'K-O', 'P-T', 'U-Z'];
 
   const filteredSongs = songs
     .filter((s) => {
@@ -130,57 +173,62 @@ export const SongsCatalogScreen: React.FC<SongsCatalogScreenProps> = ({
     setSortOrder('A-Z');
   };
 
-  const renderDifficultyBattery = (difficulty: string) => {
-    const barsCount =
-      difficulty === 'Easy' ? 1 : difficulty === 'Medium' ? 2 : difficulty === 'Hard' ? 3 : 4;
-
-    return (
-      <div className="flex items-center space-x-0.5 bg-black/60 px-1.5 py-0.5 rounded border border-white/20">
-        <div className="flex space-x-0.5 items-center">
-          {[1, 2, 3, 4].map((bar) => (
-            <div
-              key={bar}
-              className={`w-1 h-2 rounded-[1px] ${
-                bar <= barsCount ? 'bg-yellow-300' : 'bg-white/20'
-              }`}
-            />
-          ))}
-        </div>
-      </div>
-    );
-  };
-
   return (
-    <section className="flex-1 flex flex-col lg:flex-row space-y-4 lg:space-y-0 lg:space-x-6 select-none pb-8">
+    <motion.section
+      className="flex-1 flex flex-col lg:flex-row space-y-6 lg:space-y-0 lg:space-x-6 pb-8"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: 'easeOut' }}
+    >
       {/* Left Main Catalog Content */}
-      <div className="flex-1 space-y-4">
-        {/* Top Header Bar: "YOUR SONGS" and Tab categories */}
-        <div className="flex flex-wrap justify-between items-center gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-black italic tracking-wide text-white drop-shadow">
+      <motion.div
+        className="flex-1 space-y-6"
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.1 }}
+      >
+        {/* Top Header Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <motion.h1
+              className="text-headline-medium font-black italic tracking-wide text-white"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+            >
               YOUR SONGS
-            </h1>
-            <div className="flex space-x-1 bg-black/40 p-1 rounded-xl border border-white/10 overflow-x-auto scrollbar-none">
-              {letterTabs.map((tab) => (
-                <button
+            </motion.h1>
+
+            {/* Letter Tabs */}
+            <motion.div
+              className="flex gap-1 bg-surface-1 rounded-xl p-1 border border-outline-variant overflow-x-auto scrollbar-hide"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+            >
+              {letterTabs.map((tab, index) => (
+                <motion.button
                   key={tab}
-                  onClick={() => {
-                    soundEngine.playClick();
-                    setSelectedLetterTab(tab);
-                  }}
-                  className={`px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-black transition cursor-pointer shrink-0 ${
-                    selectedLetterTab === tab
-                      ? 'bg-pink-600 text-white shadow-lg'
-                      : 'text-white/60 hover:text-white'
-                  }`}
+                  onClick={() => { soundEngine.playClick(); setSelectedLetterTab(tab); }}
+                  className={`
+                    px-3 py-1.5 rounded-lg text-label-small font-semibold shrink-0
+                    transition-all motion-spring
+                    ${selectedLetterTab === tab
+                      ? 'bg-gradient-to-r from-brand-500 to-brand-600 text-white shadow-brand-glow'
+                      : 'text-on-surface-variant hover:text-on-surface hover:bg-white/5'
+                    }
+                  `}
+                  whileTap={{ scale: 0.95 }}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.02 * index }}
                 >
                   {tab}
-                </button>
+                </motion.button>
               ))}
-            </div>
+            </motion.div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <input
               ref={catalogFileInputRef}
               type="file"
@@ -189,402 +237,503 @@ export const SongsCatalogScreen: React.FC<SongsCatalogScreenProps> = ({
               onChange={handleImportCdnce}
             />
 
-            <button
-              onClick={() => {
-                soundEngine.playClick();
-                catalogFileInputRef.current?.click();
-              }}
-              className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-amber-300 rounded-xl text-xs font-black italic transition cursor-pointer flex items-center space-x-1.5 shadow"
-              title="Import .cdnce routine package from file"
-            >
-              <i className="fa-solid fa-file-import text-amber-400"></i>
-              <span>IMPORT .CDNCE</span>
-            </button>
+            <Tooltip content="Import .cdnce routine package from file" position="top">
+              <Button
+                variant="secondary"
+                size="sm"
+                leadingIcon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>}
+                onClick={() => { soundEngine.playClick(); catalogFileInputRef.current?.click(); }}
+              >
+                Import .cdnce
+              </Button>
+            </Tooltip>
 
             {onOpenTrainingStudio && (
-              <button
-                onClick={() => {
-                  soundEngine.playClick();
-                  onOpenTrainingStudio();
-                }}
-                className="px-3 py-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-400/40 text-yellow-300 rounded-xl text-xs font-black italic transition cursor-pointer flex items-center space-x-1.5 shadow"
-              >
-                <i className="fa-solid fa-graduation-cap"></i>
-                <span>+ ADD ROUTINE</span>
-              </button>
+              <Tooltip content="Open Training Studio to create custom routines" position="top">
+                <Button
+                  variant="outlined"
+                  size="sm"
+                  leadingIcon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></svg>}
+                  onClick={() => { soundEngine.playClick(); onOpenTrainingStudio(); }}
+                >
+                  + Add Routine
+                </Button>
+              </Tooltip>
             )}
           </div>
         </div>
 
-        {statusBanner && (
-          <div className="p-3 bg-amber-950/60 border border-amber-500/40 rounded-xl text-xs font-bold text-amber-300 flex items-center justify-between">
-            <span>{statusBanner}</span>
-            <button onClick={() => setStatusBanner('')} className="text-white/60 hover:text-white cursor-pointer">
-              <i className="fa-solid fa-xmark"></i>
-            </button>
-          </div>
-        )}
+        {/* Status Banner */}
+        <AnimatePresence>
+          {statusBanner && (
+            <motion.div
+              className="p-4 rounded-2xl bg-sun-900/50 border border-sun-500/30 flex items-center justify-between"
+              initial={{ opacity: 0, y: -20, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: 'auto' }}
+              exit={{ opacity: 0, y: -20, height: 0 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-sun-500/20 flex items-center justify-center text-sun-400">
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" /></svg>
+                </div>
+                <span className="text-body-medium font-semibold text-white">{statusBanner}</span>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setStatusBanner('')}>
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              </Button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Random Song Wheel Banner */}
-        <div
-          onClick={handleSpinWheel}
-          className={`w-full p-3 rounded-2xl bg-gradient-to-r from-indigo-900 via-purple-800 to-pink-600 flex items-center justify-between cursor-pointer hover:scale-[1.01] transition shadow-xl border border-white/20 ${
-            isSpinning ? 'animate-pulse ring-4 ring-pink-500' : ''
-          }`}
-        >
-          <div className="flex items-center space-x-3">
-            <div
-              className={`w-10 h-10 rounded-xl bg-yellow-300 text-black flex items-center justify-center text-lg font-black shadow shrink-0 ${
-                isSpinning ? 'animate-spin' : ''
-              }`}
+        <Tooltip content="Spin the wheel to jump into a random routine from your library" position="top">
+          <motion.button
+            onClick={handleSpinWheel}
+            className={`
+              w-full p-4 rounded-2xl flex items-center justify-between cursor-pointer hover:scale-[1.01] transition-all motion-spring
+              bg-gradient-to-r from-indigo-900/50 via-purple-900/50 to-brand-900/50
+              border border-white/10 shadow-level-2
+              ${isSpinning ? 'animate-pulse ring-2 ring-brand-500/50' : ''}
+            `}
+            whileTap={{ scale: 0.99 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <motion.div
+              className={`flex items-center gap-4 w-12 h-12 rounded-xl bg-gradient-to-r from-sun-400 to-sun-500 text-white flex items-center justify-center text-xl font-black shadow-sun-glow shrink-0 ${isSpinning ? 'animate-spin' : ''}`}
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 17 }}
+              whileTap={{ scale: 0.95 }}
             >
-              <i className="fa-solid fa-shuffle"></i>
+              <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></svg>
+            </motion.div>
+            <div className="flex-1 min-w-0">
+              <div className="text-label-large font-black uppercase text-sun-400 tracking-wider">Surprise Me!</div>
+              <div className="text-body-small text-on-surface/80 line-clamp-1">Spin the wheel to jump into a random routine from your library</div>
             </div>
-            <div>
-              <div className="text-xs font-black uppercase text-yellow-300 tracking-wider">
-                ¡Sorpréndeme! / Surprise Me!
-              </div>
-              <div className="text-[11px] text-white/80 line-clamp-1">
-                Spin the wheel to jump into a random routine from your library
-              </div>
-            </div>
-          </div>
-
-          <button className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-500 hover:scale-105 text-white text-xs font-black italic rounded-full shadow-lg border border-white/20 cursor-pointer shrink-0">
-            {isSpinning ? 'SPINNING...' : '¡DANCE!'}
-          </button>
-        </div>
+            <motion.button
+              className="px-5 py-2.5 bg-gradient-to-r from-purple-500 to-brand-500 hover:from-purple-400 hover:to-brand-400 text-white text-label-large font-black italic rounded-full shadow-level-2 border border-white/20 shrink-0"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.97 }}
+              disabled={isSpinning}
+            >
+              {isSpinning ? 'SPINNING...' : '¡DANCE!'}
+            </motion.button>
+          </motion.button>
+        </Tooltip>
 
         {/* Search Input */}
-        <div className="relative">
-          <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-white/40 text-xs"></i>
-          <input
-            type="text"
+        <motion.div
+          className="relative"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+        >
+          <Input
+            type="search"
+            placeholder="Search songs, artists, or genres..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search songs, artists, or genres..."
-            className="w-full pl-10 pr-4 py-2.5 bg-[#130b33]/80 border border-white/15 rounded-xl text-xs font-medium text-white placeholder-white/40 focus:outline-none focus:border-pink-500 transition shadow-inner"
+            leadingIcon={<svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>}
+            size="md"
+            fullWidth
           />
-        </div>
+        </motion.div>
 
-        {/* Mobile Quick Filter Chips (Visible on mobile/tablet) */}
-        <div className="flex lg:hidden overflow-x-auto space-x-1.5 py-1 scrollbar-none">
-          {['ALL', 'Easy', 'Medium', 'Hard', 'Extreme'].map((d) => (
-            <button
-              key={d}
-              onClick={() => {
-                soundEngine.playClick();
-                setSelectedDiff(d);
-              }}
-              className={`px-3 py-1 rounded-full text-[10px] font-black transition cursor-pointer shrink-0 ${
-                selectedDiff === d ? 'bg-pink-600 text-white shadow' : 'bg-white/10 text-white/70'
-              }`}
-            >
-              {d === 'ALL' ? 'ALL DIFFICULTIES' : d.toUpperCase()}
-            </button>
+        {/* Mobile Quick Filter Chips */}
+        <motion.div
+          className="flex lg:hidden overflow-x-auto gap-2 py-2 scrollbar-hide"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+        >
+          {difficultyOptions.map((d) => (
+            <Chip
+              key={d.value}
+              label={d.value === 'ALL' ? 'All Difficulties' : d.value.toUpperCase()}
+              variant={selectedDiff === d.value ? 'primary' : 'filter'}
+              selected={selectedDiff === d.value}
+              onClick={() => { soundEngine.playClick(); setSelectedDiff(d.value); }}
+            />
           ))}
-          {['Pop', 'Electro-Dance', 'K-Pop'].map((g) => (
-            <button
-              key={g}
-              onClick={() => {
-                soundEngine.playClick();
-                setSelectedGenre(selectedGenre === g ? 'ALL' : g);
-              }}
-              className={`px-3 py-1 rounded-full text-[10px] font-black transition cursor-pointer shrink-0 ${
-                selectedGenre === g ? 'bg-cyan-500 text-black shadow' : 'bg-white/10 text-white/70'
-              }`}
-            >
-              {g}
-            </button>
+          {genreOptions.slice(1).map((g) => (
+            <Chip
+              key={g.value}
+              label={g.value}
+              variant={selectedGenre === g.value ? 'secondary' : 'filter'}
+              selected={selectedGenre === g.value}
+              onClick={() => { soundEngine.playClick(); setSelectedGenre(selectedGenre === g.value ? 'ALL' : g.value); }}
+            />
           ))}
-        </div>
+        </motion.div>
 
-        {/* Responsive Songs Grid: 2 cols on mobile, 3 cols on tablet, 3-4 cols on desktop */}
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-          {filteredSongs.map((song) => {
-            const isHovered = hoveredSongId === song.id;
+        {/* Responsive Songs Grid */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={`${selectedLetterTab}-${selectedGenre}-${selectedDiff}-${selectedMood}-${sortOrder}`}
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+          >
+            {filteredSongs.length > 0 ? (
+              filteredSongs.map((song, index) => {
+                const isHovered = hoveredSongId === song.id;
+                const coachCount = song.detectedCoachCount || song.coaches?.length || 1;
+                const diffColor = song.difficulty === 'Extreme' ? 'error' : song.difficulty === 'Hard' ? 'warning' : 'success';
 
-            return (
-              <div
-                key={song.id}
-                onMouseEnter={() => setHoveredSongId(song.id)}
-                onMouseLeave={() => setHoveredSongId(null)}
-                onClick={() => {
-                  soundEngine.playClick();
-                  onSelectSong(song);
-                }}
-                className={`group relative bg-[#0f0920] rounded-2xl overflow-hidden border cursor-pointer transition-all duration-200 ${
-                  isHovered
-                    ? 'border-pink-500/80 shadow-[0_10px_30px_rgba(255,20,147,0.35)] -translate-y-1 z-20'
-                    : 'border-white/10 hover:border-white/30'
-                }`}
-              >
-                <div className="h-32 sm:h-36 bg-slate-900 relative overflow-hidden">
-                  <img
-                    src={song.coverImg}
-                    alt={song.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    onError={(e) => {
-                      (e.target as HTMLElement).style.display = 'none';
-                    }}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 pointer-events-none"></div>
-
-                  {/* Delete custom song button */}
-                  {song.isCustomTrained && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        soundEngine.playClick();
-                        setSongToDelete(song);
-                      }}
-                      className="absolute top-2 left-2 bg-black/80 hover:bg-red-600 text-white/70 hover:text-white p-1.5 rounded-lg text-[10px] transition z-30 cursor-pointer shadow border border-white/10"
-                      title="Delete Custom Routine"
+                return (
+                  <Tooltip key={song.id} content={`${song.title} by ${song.artist}`} position="top">
+                    <Card
+                      variant="filled"
+                      interactive
+                      onClick={() => { soundEngine.playClick(); onSelectSong(song); }}
+                      className="group overflow-hidden"
+                      whileHover={{ y: -8, boxShadow: 'var(--shadow-level-4)' }}
+                      initial={{ opacity: 0, y: 30 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.03 * index, type: 'spring', stiffness: 500, damping: 30 }}
                     >
-                      <i className="fa-solid fa-trash-can"></i>
-                    </button>
-                  )}
+                      <CardMedia aspectRatio="video" rounded="none">
+                        <motion.img
+                          src={song.coverImg}
+                          alt={song.title}
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                          initial={{ scale: 1.1 }}
+                          animate={{ scale: 1 }}
+                          transition={{ duration: 0.5 }}
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 pointer-events-none" />
 
-                  {/* Export .cdnce Package Button */}
-                  <button
-                    onClick={(e) => handleExportCdnce(e, song)}
-                    disabled={exportingSongId === song.id}
-                    className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-amber-500/80 hover:bg-amber-400 text-black text-[10px] font-black uppercase shadow cursor-pointer transition flex items-center space-x-1 z-30"
-                    title="Export .cdnce routine package (video + moves)"
-                  >
-                    <i className={`fa-solid ${exportingSongId === song.id ? 'fa-spinner animate-spin' : 'fa-file-export'} text-[9px]`}></i>
-                    <span>.CDNCE</span>
-                  </button>
+                        {/* Delete custom song button */}
+                        {song.isCustomTrained && onDeleteSong && (
+                          <Tooltip content="Delete Custom Routine" position="top">
+                            <IconButton
+                              variant="ghost"
+                              size="sm"
+                              aria-label="Delete routine"
+                              onClick={(e) => { e.stopPropagation(); soundEngine.playClick(); setSongToDelete(song); }}
+                              className="absolute top-3 left-3"
+                            >
+                              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
+                            </IconButton>
+                          </Tooltip>
+                        )}
 
-                  {/* Coach count badge */}
-                  <div className="absolute top-2 right-20 bg-black/70 backdrop-blur-md px-2 py-0.5 rounded-md text-[10px] text-cyan-300 font-bold border border-white/10 shadow">
-                    {song.detectedCoachCount || song.coaches?.length || 1}{' '}
-                    {(song.detectedCoachCount || song.coaches?.length || 1) > 1 ? 'COACHES' : 'COACH'}
-                  </div>
+                        {/* Export .cdnce Package Button */}
+                        <Tooltip content="Export .cdnce routine package (video + moves)" position="top">
+                          <IconButton
+                            variant="outlined"
+                            size="sm"
+                            aria-label="Export .cdnce"
+                            onClick={(e) => handleExportCdnce(e, song)}
+                            disabled={exportingSongId === song.id}
+                            className="absolute top-3 right-3"
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: isHovered ? 1 : 0, x: isHovered ? 0 : 20 }}
+                            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                          >
+                            {exportingSongId === song.id ? (
+                              <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10" strokeOpacity="0.25" /><path d="M12 2a10 10 0 0 1 10 10" /></svg>
+                            ) : (
+                              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+                            )}
+                          </IconButton>
+                        </Tooltip>
 
-                  {/* Bottom row on card: BPM on left, Difficulty on right */}
-                  <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center text-xs">
-                    <span className="text-[11px] font-bold text-white/90">
-                      {song.bpm} BPM
-                    </span>
-                    <span className={`text-[10px] font-black uppercase tracking-wider ${
-                      song.difficulty === 'Extreme'
-                        ? 'text-red-400'
-                        : song.difficulty === 'Hard'
-                        ? 'text-amber-300'
-                        : 'text-emerald-400'
-                    }`}>
-                      {song.difficulty}
-                    </span>
-                  </div>
+                        {/* Coach count badge */}
+                        <motion.div
+                          className="absolute top-3 right-3 bg-surface-1/90 backdrop-blur px-2 py-1 rounded-lg text-label-small font-bold text-accent-400 border border-outline-variant"
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                        >
+                          {coachCount} {coachCount > 1 ? 'Coaches' : 'Coach'}
+                        </motion.div>
 
-                  {/* Play Action Hover Glow */}
-                  <div className={`absolute inset-0 bg-pink-950/40 backdrop-blur-[2px] flex items-center justify-center transition-opacity duration-150 ${
-                    isHovered ? 'opacity-100' : 'opacity-0 pointer-events-none'
-                  }`}>
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-r from-pink-500 to-amber-400 flex items-center justify-center text-black shadow-lg">
-                      <i className="fa-solid fa-play text-xs ml-0.5"></i>
-                    </div>
-                  </div>
-                </div>
+                        {/* Bottom row on card */}
+                        <motion.div
+                          className="absolute bottom-3 left-3 right-3 flex justify-between items-center"
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.1 }}
+                        >
+                          <span className="text-label-large font-bold text-white">{song.bpm} BPM</span>
+                          <Badge variant={diffColor} size="sm">{song.difficulty}</Badge>
+                        </motion.div>
 
-                <div className="p-3 space-y-1">
-                  <div className="font-black italic text-sm text-white group-hover:text-pink-400 transition truncate leading-snug">
-                    {song.title}
-                  </div>
-                  <div className="text-[11px] text-white/60 truncate">{song.artist}</div>
-                  <div className="flex items-center justify-between text-[10px] text-white/40 pt-0.5">
-                    <span className="truncate max-w-[70%]">{song.genre}</span>
-                    {song.isCustomTrained && (
-                      <span className="text-[9px] bg-yellow-400 text-black font-black px-1.5 py-0.2 rounded">
-                        CUSTOM
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+                        {/* Play Action Hover Glow */}
+                        <motion.div
+                          className="absolute inset-0 bg-gradient-to-t from-brand-900/50 via-transparent to-transparent flex items-center justify-center"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: isHovered ? 1 : 0 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          <motion.div
+                            className="w-12 h-12 rounded-full bg-gradient-to-r from-brand-500 to-sun-400 flex items-center justify-center text-white shadow-level-3"
+                            initial={{ scale: 0.8 }}
+                            animate={{ scale: isHovered ? 1 : 0.8 }}
+                            transition={{ type: 'spring', stiffness: 500, damping: 17 }}
+                            whileTap={{ scale: 0.9 }}
+                          >
+                            <svg className="w-6 h-6 ml-1" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3" /></svg>
+                          </motion.div>
+                        </motion.div>
+                      </CardMedia>
 
-          {filteredSongs.length === 0 && (
-            <div className="col-span-full text-center py-12 text-white/50 text-xs font-bold space-y-2">
-              <div>No songs found matching your filters.</div>
-              <button
-                onClick={handleResetFilters}
-                className="px-4 py-2 bg-pink-600 text-white rounded-full text-xs font-bold cursor-pointer"
+                      <CardContent className="p-4 space-y-2">
+                        <motion.h3
+                          className="font-black italic text-title-small text-white group-hover:text-brand-400 transition-colors truncate"
+                        >
+                          {song.title}
+                        </motion.h3>
+                        <p className="text-body-small text-on-surface-variant truncate">{song.artist}</p>
+                        <div className="flex items-center justify-between text-label-small text-on-surface-disabled pt-1">
+                          <span className="truncate max-w-[70%]">{song.genre}</span>
+                          {song.isCustomTrained && (
+                            <Badge variant="warning" size="sm" dot dotColor="sun">CUSTOM</Badge>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Tooltip>
+                );
+              })
+            ) : (
+              <motion.div
+                className="col-span-full py-16 px-6 rounded-2xl bg-surface-1 border border-outline-variant text-center space-y-4"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
               >
-                Reset Filters
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
+                <motion.div className="w-16 h-16 rounded-2xl bg-surface-2 border border-outline mx-auto flex items-center justify-center text-2xl text-on-surface-variant" initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 500, damping: 17 }}>
+                  <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg>
+                </motion.div>
+                <div className="text-body-medium font-bold text-on-surface/80">No songs found matching your filters</div>
+                <Button variant="primary" size="sm" onClick={handleResetFilters}>
+                  Reset Filters
+                </Button>
+              </motion.div>
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </motion.div>
 
       {/* Right Filter Sidebar (Desktop/Laptop) */}
-      <div className="hidden lg:block w-72 bg-[#0f0c2e]/90 rounded-2xl p-4 border border-white/10 space-y-3 h-fit backdrop-blur-md shadow-2xl">
-        <div className="text-xs font-black text-white/60 uppercase tracking-widest pb-1 border-b border-white/10 flex justify-between items-center">
+      <motion.aside
+        className="hidden lg:block w-80 lg:w-80 bg-surface-1/90 backdrop-blur-xl rounded-2xl p-5 border border-outline-variant space-y-5 h-fit shadow-level-3"
+        initial={{ opacity: 0, x: 40 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.2 }}
+      >
+        <div className="text-label-small font-black text-on-surface-variant uppercase tracking-widest pb-2 border-b border-outline-variant flex justify-between items-center">
           <span>Filter & Sort</span>
-          <i className="fa-solid fa-filter text-pink-400"></i>
+          <svg className="w-5 h-5 text-brand-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
         </div>
 
         {/* Sort Dropdown */}
-        <div className="space-y-1">
-          <label className="text-[10px] font-bold text-white/50 uppercase">Sort by</label>
-          <select
+        <div className="space-y-2">
+          <label className="text-label-small font-semibold text-on-surface-variant uppercase tracking-wider">Sort by</label>
+          <Select
             value={sortOrder}
-            onChange={(e) => {
-              soundEngine.playClick();
-              setSortOrder(e.target.value as any);
-            }}
-            className="w-full px-3 py-2 bg-black/60 border border-white/15 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-pink-500 cursor-pointer"
-          >
-            <option value="A-Z">Alphabetically (A to Z)</option>
-            <option value="DIFF">By Difficulty</option>
-            <option value="BPM">By BPM Tempo</option>
-          </select>
+            options={sortOptions}
+            onChange={(e) => { soundEngine.playClick(); setSortOrder(e.target.value as any); }}
+            size="md"
+            fullWidth
+          />
         </div>
 
         {/* Difficulty Filter */}
-        <div className="space-y-1">
-          <div className="text-[10px] font-bold text-white/50 uppercase">Difficulty</div>
-          <div className="grid grid-cols-2 gap-1.5">
-            {['ALL', 'Easy', 'Medium', 'Hard', 'Extreme'].map((diff) => (
-              <button
-                key={diff}
-                onClick={() => {
-                  soundEngine.playClick();
-                  setSelectedDiff(diff);
-                }}
-                className={`py-1.5 px-2 rounded-lg text-[10px] font-black transition cursor-pointer ${
-                  selectedDiff === diff
-                    ? 'bg-pink-500 text-white shadow'
-                    : 'bg-white/10 hover:bg-white/20 text-white/70'
-                }`}
+        <div className="space-y-2">
+          <label className="text-label-small font-semibold text-on-surface-variant uppercase tracking-wider">Difficulty</label>
+          <div className="grid grid-cols-2 gap-2">
+            {difficultyOptions.map((diff) => (
+              <motion.button
+                key={diff.value}
+                onClick={() => { soundEngine.playClick(); setSelectedDiff(diff.value); }}
+                className={`
+                  py-2 px-3 rounded-xl text-label-small font-semibold transition-all motion-spring
+                  ${selectedDiff === diff.value
+                    ? 'bg-gradient-to-r from-brand-500 to-brand-600 text-white shadow-brand-glow'
+                    : 'bg-surface-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-3'
+                  }
+                `}
+                whileTap={{ scale: 0.97 }}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.03 * difficultyOptions.indexOf(diff) }}
               >
-                {diff}
-              </button>
+                {diff.value}
+              </motion.button>
             ))}
           </div>
         </div>
 
         {/* Interactive Expandable Category Filters */}
-        <div className="space-y-2 pt-1 border-t border-white/10">
+        <div className="space-y-3 pt-2 border-t border-outline-variant">
           {/* Music Genres */}
-          <div className="space-y-1">
-            <button
-              onClick={() => {
-                soundEngine.playClick();
-                setExpandedAccordion(expandedAccordion === 'GENRES' ? null : 'GENRES');
-              }}
-              className="w-full text-left text-xs font-black py-2 px-3 rounded-xl bg-white/10 hover:bg-white/15 transition cursor-pointer flex justify-between items-center text-white"
+          <div className="space-y-2">
+            <motion.button
+              onClick={() => { soundEngine.playClick(); setExpandedAccordion(expandedAccordion === 'GENRES' ? null : 'GENRES'); }}
+              className="w-full text-left text-label-small font-black py-3 px-3 rounded-xl bg-surface-2 hover:bg-surface-3 transition-colors flex justify-between items-center"
+              whileTap={{ scale: 0.99 }}
             >
-              <div className="flex items-center space-x-2">
-                <i className="fa-solid fa-music text-[9px] text-cyan-400"></i>
-                <span>MUSIC GENRES {selectedGenre !== 'ALL' && `(${selectedGenre})`}</span>
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-accent-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg>
+                <span>Music Genres {selectedGenre !== 'ALL' && `(${selectedGenre})`}</span>
               </div>
-              <i className={`fa-solid text-[9px] text-white/50 transition ${expandedAccordion === 'GENRES' ? 'fa-chevron-down' : 'fa-chevron-right'}`}></i>
-            </button>
+              <motion.svg
+                className="w-4 h-4 text-on-surface-disabled"
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                animate={{ rotate: expandedAccordion === 'GENRES' ? 180 : 0 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </motion.svg>
+            </motion.button>
 
-            {expandedAccordion === 'GENRES' && (
-              <div className="grid grid-cols-2 gap-1.5 p-2 bg-black/40 rounded-xl border border-white/10">
-                {['ALL', 'Pop', 'K-Pop', 'Electro-Dance'].map((g) => (
-                  <button
-                    key={g}
-                    onClick={() => {
-                      soundEngine.playClick();
-                      setSelectedGenre(g);
-                    }}
-                    className={`py-1 px-2 rounded-lg text-[10px] font-black transition cursor-pointer truncate ${
-                      selectedGenre === g ? 'bg-cyan-500 text-black shadow' : 'bg-white/10 text-white/70 hover:bg-white/20'
-                    }`}
-                  >
-                    {g}
-                  </button>
-                ))}
-              </div>
-            )}
+            <AnimatePresence>
+              {expandedAccordion === 'GENRES' && (
+                <motion.div
+                  className="grid grid-cols-2 gap-2 p-2 bg-surface-1 rounded-xl border border-outline-variant"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                >
+                  {genreOptions.map((g) => (
+                    <motion.button
+                      key={g.value}
+                      onClick={() => { soundEngine.playClick(); setSelectedGenre(g.value); }}
+                      className={`
+                        py-2 px-3 rounded-lg text-label-small font-semibold truncate transition-all motion-spring
+                        ${selectedGenre === g.value
+                          ? 'bg-gradient-to-r from-accent-500 to-accent-600 text-white shadow-accent-glow'
+                          : 'bg-surface-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-3'
+                        }
+                      `}
+                      whileTap={{ scale: 0.97 }}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.02 * genreOptions.indexOf(g) }}
+                    >
+                      {g.label}
+                    </motion.button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Moods Filter */}
-          <div className="space-y-1">
-            <button
-              onClick={() => {
-                soundEngine.playClick();
-                setExpandedAccordion(expandedAccordion === 'MOODS' ? null : 'MOODS');
-              }}
-              className="w-full text-left text-xs font-black py-2 px-3 rounded-xl bg-white/10 hover:bg-white/15 transition cursor-pointer flex justify-between items-center text-white"
+          <div className="space-y-2">
+            <motion.button
+              onClick={() => { soundEngine.playClick(); setExpandedAccordion(expandedAccordion === 'MOODS' ? null : 'MOODS'); }}
+              className="w-full text-left text-label-small font-black py-3 px-3 rounded-xl bg-surface-2 hover:bg-surface-3 transition-colors flex justify-between items-center"
+              whileTap={{ scale: 0.99 }}
             >
-              <div className="flex items-center space-x-2">
-                <i className="fa-solid fa-face-smile text-[9px] text-yellow-300"></i>
-                <span>MOODS {selectedMood !== 'ALL' && `(${selectedMood})`}</span>
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-sun-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M8 14s1.5 2 4 2 4-2 4-2" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" /></svg>
+                <span>Moods {selectedMood !== 'ALL' && `(${selectedMood})`}</span>
               </div>
-              <i className={`fa-solid text-[9px] text-white/50 transition ${expandedAccordion === 'MOODS' ? 'fa-chevron-down' : 'fa-chevron-right'}`}></i>
-            </button>
+              <motion.svg
+                className="w-4 h-4 text-on-surface-disabled"
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                animate={{ rotate: expandedAccordion === 'MOODS' ? 180 : 0 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </motion.svg>
+            </motion.button>
 
-            {expandedAccordion === 'MOODS' && (
-              <div className="grid grid-cols-2 gap-1.5 p-2 bg-black/40 rounded-xl border border-white/10">
-                {['ALL', 'Party', 'Cyber', 'Energetic'].map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => {
-                      soundEngine.playClick();
-                      setSelectedMood(m);
-                    }}
-                    className={`py-1 px-2 rounded-lg text-[10px] font-black transition cursor-pointer truncate ${
-                      selectedMood === m ? 'bg-yellow-400 text-black shadow' : 'bg-white/10 text-white/70 hover:bg-white/20'
-                    }`}
-                  >
-                    {m}
-                  </button>
-                ))}
-              </div>
-            )}
+            <AnimatePresence>
+              {expandedAccordion === 'MOODS' && (
+                <motion.div
+                  className="grid grid-cols-2 gap-2 p-2 bg-surface-1 rounded-xl border border-outline-variant"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                >
+                  {moodOptions.map((m) => (
+                    <motion.button
+                      key={m.value}
+                      onClick={() => { soundEngine.playClick(); setSelectedMood(m.value); }}
+                      className={`
+                        py-2 px-3 rounded-lg text-label-small font-semibold truncate transition-all motion-spring
+                        ${selectedMood === m.value
+                          ? 'bg-gradient-to-r from-sun-500 to-sun-600 text-white shadow-sun-glow'
+                          : 'bg-surface-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-3'
+                        }
+                      `}
+                      whileTap={{ scale: 0.97 }}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.02 * moodOptions.indexOf(m) }}
+                    >
+                      {m.label}
+                    </motion.button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
 
         {/* Reset Filters Button */}
-        <button
+        <Button
+          variant="outlined"
+          fullWidth
+          size="md"
           onClick={handleResetFilters}
-          className="w-full py-2.5 bg-black/50 hover:bg-white/10 border border-white/20 rounded-xl text-xs font-black uppercase tracking-wider text-white/80 hover:text-white transition cursor-pointer mt-2"
+          className="mt-2"
         >
           RESET FILTERS
-        </button>
-      </div>
+        </Button>
+      </motion.aside>
 
       {/* Delete Dance Routine Confirmation Modal */}
-      {songToDelete && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="max-w-sm w-full bg-[#130b33] border-2 border-pink-500/80 rounded-3xl p-6 shadow-[0_0_40px_rgba(255,20,147,0.5)] text-white space-y-4 text-center">
-            <div className="w-14 h-14 rounded-full bg-red-600/20 text-red-400 border border-red-500/50 flex items-center justify-center text-2xl mx-auto shadow-[0_0_20px_rgba(239,68,68,0.4)]">
-              <i className="fa-solid fa-trash-can"></i>
-            </div>
-            <div className="space-y-1.5">
-              <h3 className="text-xl font-black italic tracking-wide">Delete Dance Routine?</h3>
-              <p className="text-xs text-white/70">
-                Are you sure you want to delete <strong className="text-pink-400">"{songToDelete.title}"</strong> by {songToDelete.artist} from your catalog?
-              </p>
-            </div>
-            <div className="flex space-x-3 pt-2">
-              <button
-                onClick={() => setSongToDelete(null)}
-                className="flex-1 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold cursor-pointer transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  soundEngine.playClick();
-                  if (onDeleteSong) onDeleteSong(songToDelete.id);
-                  setSongToDelete(null);
-                }}
-                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black italic cursor-pointer shadow-lg transition"
-              >
-                Delete Routine
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </section>
+      <AnimatePresence>
+        {songToDelete && (
+          <motion.div
+            className="fixed inset-0 z-[500] flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSongToDelete(null)}
+          >
+            <motion.div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+            <motion.div
+              className="relative max-w-md w-full bg-surface-3 border-2 border-brand-500/50 rounded-3xl p-6 shadow-level-4 space-y-5 text-center"
+              onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+            >
+              <motion.div className="w-16 h-16 rounded-full bg-error-500/20 text-error-400 border border-error-500/50 flex items-center justify-center text-3xl mx-auto shadow-error-glow" initial={{ scale: 0, rotate: -180 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 500, damping: 17 }}>
+                <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
+              </motion.div>
+              <div className="space-y-2">
+                <h3 className="text-headline-small font-black italic tracking-wide text-white">Delete Dance Routine?</h3>
+                <p className="text-body-medium text-on-surface-variant">
+                  Are you sure you want to delete <strong className="text-brand-400">"{songToDelete.title}"</strong> by {songToDelete.artist} from your catalog?
+                </p>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <Button variant="outlined" fullWidth onClick={() => setSongToDelete(null)}>Cancel</Button>
+                <Button variant="danger" fullWidth onClick={() => { soundEngine.playClick(); if (onDeleteSong) onDeleteSong(songToDelete.id); setSongToDelete(null); }}>
+                  Delete Routine
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.section>
   );
 };
+
+export default SongsCatalogScreen;

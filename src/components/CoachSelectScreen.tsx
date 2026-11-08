@@ -1,6 +1,19 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Song, Coach, Player } from '../types/game';
 import { soundEngine } from '../services/soundEffects';
+import {
+  Card,
+  CardMedia,
+  CardContent,
+  CardActions,
+  Button,
+  IconButton,
+  Avatar,
+  Badge,
+  Chip,
+  Tooltip,
+} from './ui';
 
 interface CoachSelectScreenProps {
   song: Song;
@@ -26,7 +39,7 @@ export const CoachSelectScreen: React.FC<CoachSelectScreenProps> = ({
             avatarSeed: 'CoachLead',
             routineName: 'Routine A',
             difficulty: song.difficulty || 'Medium',
-            colorGradient: 'from-pink-600 via-purple-600 to-indigo-900',
+            colorGradient: 'from-brand-500 via-purple-600 to-indigo-900',
             coachIndex: 0,
           },
         ];
@@ -35,7 +48,6 @@ export const CoachSelectScreen: React.FC<CoachSelectScreenProps> = ({
   const [playerAssignments, setPlayerAssignments] = useState<Record<string, number>>(() => {
     const initial: Record<string, number> = {};
     players.forEach((p, idx) => {
-      // By default distribute players across available coaches
       initial[p.id] = (p.assignedCoachIndex ?? idx) % coachesList.length;
     });
     return initial;
@@ -60,197 +72,278 @@ export const CoachSelectScreen: React.FC<CoachSelectScreenProps> = ({
     onSelectCoachAndStart(selectedCoach, playerAssignments);
   };
 
-  return (
-    <section className="flex-1 flex flex-col items-center justify-between space-y-4 select-none py-2 relative">
-      {/* Top Bar with Back Button and Song Details */}
-      <div className="w-full flex items-center justify-between px-2">
-        <button
-          onClick={() => {
-            soundEngine.playClick();
-            onBackToCatalog();
-          }}
-          className="flex items-center space-x-2 bg-indigo-950/90 hover:bg-pink-600 px-4 py-2 rounded-full border border-white/20 text-xs font-black italic shadow-lg cursor-pointer transition text-white"
-        >
-          <i className="fa-solid fa-arrow-left"></i>
-          <span>BACK TO SONGS</span>
-        </button>
+  const diffColorMap: Record<string, 'success' | 'warning' | 'error'> = {
+    Easy: 'success',
+    Medium: 'success',
+    Hard: 'warning',
+    Extreme: 'error',
+  };
 
-        <div className="text-center">
-          <h1 className="text-2xl md:text-4xl font-black italic text-pink-400 drop-shadow-[0_0_20px_rgba(255,20,147,0.8)]">
-            Select your Coach
+  return (
+    <motion.section
+      className="flex-1 flex flex-col items-center justify-between space-y-6 py-6 relative max-w-7xl mx-auto w-full px-4"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: 'easeOut' }}
+    >
+      {/* Top Bar with Back Button and Song Details */}
+      <motion.div
+        className="w-full flex items-center justify-between px-2"
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+      >
+        <Tooltip content="Back to Song Library" position="right">
+          <Button
+            variant="secondary"
+            size="sm"
+            leadingIcon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg>}
+            onClick={() => { soundEngine.playClick(); onBackToCatalog(); }}
+          >
+            BACK TO LIBRARY
+          </Button>
+        </Tooltip>
+
+        <motion.div className="text-center flex-1" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+          <h1 className="text-headline-large font-black italic text-transparent bg-clip-text bg-gradient-to-r from-brand-400 to-sun-400 drop-shadow-[0_0_20px_rgba(217,30,109,0.8)]">
+            Select Your Coach
           </h1>
-          <p className="text-xs font-bold text-white/80">
+          <p className="text-body-medium font-semibold text-on-surface/80 mt-1">
             {song.title} — {song.artist} •{' '}
-            <span className="text-cyan-400 font-extrabold uppercase">
+            <span className="text-accent-400 font-black uppercase">
               {coachesList.length} {coachesList.length === 1 ? 'Coach' : 'Coaches'} Available
             </span>
           </p>
-        </div>
+        </motion.div>
 
-        <div className="w-24"></div>
-      </div>
+        <div className="w-24" />
+      </motion.div>
 
       {/* Multi-Player Switcher Header if more than 1 player is connected */}
       {players.length > 1 && (
-        <div className="flex items-center space-x-3 bg-black/60 px-4 py-2 rounded-2xl border border-white/15">
-          <span className="text-[11px] font-black uppercase text-white/70">
-            Choose Coach for:
-          </span>
-          <div className="flex space-x-2">
+        <motion.div
+          className="flex items-center gap-3 bg-surface-1/50 backdrop-blur-xl rounded-2xl border border-outline-variant px-4 py-3"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <span className="text-label-small font-black uppercase text-on-surface-variant tracking-wider">Choose Coach for:</span>
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide">
             {players.map((p) => {
               const isSelected = activePlayerForPick === p.id;
               const assignedIdx = playerAssignments[p.id] ?? 0;
               const coachName = coachesList[assignedIdx]?.name || `Coach ${assignedIdx + 1}`;
 
               return (
-                <button
-                  key={p.id}
-                  onClick={() => {
-                    soundEngine.playClick();
-                    setActivePlayerForPick(p.id);
-                  }}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center space-x-2 border transition cursor-pointer ${
-                    isSelected
-                      ? 'bg-pink-600 text-white border-white shadow-[0_0_12px_#ff1493]'
-                      : 'bg-indigo-950/70 text-white/80 border-white/20 hover:border-pink-400'
-                  }`}
-                >
-                  <img
-                    src={`https://api.dicebear.com/7.x/bottts/svg?seed=${p.avatarSeed}`}
-                    className="w-4 h-4 rounded-full bg-black"
-                    alt={p.name}
-                  />
-                  <span>{p.name.split(' ')[0]}</span>
-                  <span className="text-[10px] bg-black/40 px-1.5 py-0.5 rounded text-cyan-300">
-                    {coachName}
-                  </span>
-                </button>
+                <Tooltip key={p.id} content={`${p.name} → ${coachName}`} position="bottom">
+                  <motion.button
+                    onClick={() => { soundEngine.playClick(); setActivePlayerForPick(p.id); }}
+                    className={`
+                      flex items-center gap-2 px-3 py-2 rounded-xl text-label-small font-semibold shrink-0
+                      transition-all motion-spring
+                      ${isSelected
+                        ? 'bg-gradient-to-r from-brand-500 to-brand-600 text-white shadow-brand-glow'
+                        : 'bg-surface-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-3'
+                      }
+                    `}
+                    whileTap={{ scale: 0.97 }}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.05 * players.indexOf(p) }}
+                  >
+                    <Avatar
+                      src={`https://api.dicebear.com/7.x/bottts/svg?seed=${p.avatarSeed}`}
+                      alt={p.name}
+                      name={p.name}
+                      size="xs"
+                      border
+                      borderColor={isSelected ? 'brand' : 'white'}
+                    />
+                    <span>{p.name.split(' ')[0]}</span>
+                    <Badge variant="secondary" size="sm">{coachName}</Badge>
+                  </motion.button>
+                </Tooltip>
               );
             })}
           </div>
-        </div>
+        </motion.div>
       )}
 
-      {/* 1 to 5 Coaches Grid matching ColeDance UI Layout */}
-      <div
-        className={`flex flex-wrap items-center justify-center gap-4 md:gap-6 w-full max-w-6xl py-2 ${
-          coachesList.length <= 2
-            ? 'max-w-2xl'
-            : coachesList.length === 3
-            ? 'max-w-4xl'
-            : 'max-w-6xl'
-        }`}
+      {/* 1 to 5 Coaches Grid */}
+      <motion.div
+        className={`
+          flex flex-wrap items-center justify-center gap-5 md:gap-7 w-full
+          ${coachesList.length <= 2 ? 'max-w-3xl' : coachesList.length === 3 ? 'max-w-5xl' : 'max-w-6xl'}
+        `}
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.25 }}
       >
         {coachesList.map((coach, index) => {
-          // Check which players are assigned to this coach
           const assignedPlayers = players.filter(
             (p) => (playerAssignments[p.id] ?? 0) === index
           );
           const isAssignedToActive = (playerAssignments[activePlayerForPick] ?? 0) === index;
 
           return (
-            <div
-              key={coach.id || index}
-              onClick={() => handleSelectCoachForActivePlayer(index)}
-              className={`group relative rounded-3xl overflow-hidden border-2 cursor-pointer transition-all duration-300 transform p-4 flex flex-col justify-between shadow-[0_15px_35px_rgba(0,0,0,0.6)] ${
-                coachesList.length === 1
-                  ? 'w-72 md:w-80 h-[28rem]'
-                  : coachesList.length === 2
-                  ? 'w-64 md:w-72 h-[27rem]'
-                  : coachesList.length === 3
-                  ? 'w-56 md:w-64 h-[26rem]'
-                  : 'w-48 md:w-56 h-[25rem]'
-              } ${
-                isAssignedToActive
-                  ? 'border-pink-400 ring-4 ring-pink-500/50 scale-105 -translate-y-2 bg-gradient-to-t from-[#2c0957] via-[#3a1078] to-[#1a0538]'
-                  : 'border-white/20 hover:border-pink-500 bg-gradient-to-t from-[#1b0840] via-[#2a0e5b] to-[#12042d] hover:scale-102'
-              }`}
-            >
-              {/* Pattern Background */}
-              <div className="absolute inset-0 opacity-15 mix-blend-overlay bg-[radial-gradient(#ff1493_1px,transparent_1px)] [background-size:16px_16px]"></div>
-
-              {/* Coach Badge Header */}
-              <div className="flex items-center justify-between z-10">
-                <span className="bg-black/70 px-3 py-1 rounded-full text-[10px] font-black text-cyan-300 border border-white/10 uppercase tracking-widest shadow">
-                  COACH {index + 1}
-                </span>
-
-                <span
-                  className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase border ${
-                    coach.difficulty === 'Easy'
-                      ? 'bg-emerald-600/80 text-white border-emerald-400'
-                      : coach.difficulty === 'Medium'
-                      ? 'bg-amber-600/80 text-white border-amber-400'
-                      : 'bg-rose-600/80 text-white border-rose-400'
-                  }`}
-                >
-                  {coach.difficulty}
-                </span>
-              </div>
-
-              {/* Coach Avatar Illustration */}
-              <div className="relative my-auto flex justify-center items-center z-10">
-                <div
-                  className={`absolute w-40 h-40 rounded-full blur-2xl transition ${
+            <Tooltip key={coach.id || index} content={coach.name} position="top">
+              <motion.button
+                onClick={() => handleSelectCoachForActivePlayer(index)}
+                className={`
+                  group relative rounded-3xl overflow-hidden border-2 cursor-pointer transition-all motion-spring p-5 flex flex-col justify-between shadow-level-3
+                  ${coachesList.length === 1 ? 'w-80 md:w-96 h-[32rem]' : coachesList.length === 2 ? 'w-72 md:w-80 h-[30rem]' : coachesList.length === 3 ? 'w-64 md:w-72 h-[28rem]' : 'w-56 md:w-64 h-[26rem]'}
+                  ${
                     isAssignedToActive
-                      ? 'bg-pink-500/50 scale-110'
-                      : 'bg-pink-500/20 group-hover:bg-pink-500/40'
-                  }`}
-                ></div>
-                <img
-                  src={`https://api.dicebear.com/7.x/big-smile/svg?seed=${coach.avatarSeed || coach.name}`}
-                  alt={coach.name}
-                  className="w-full h-48 md:h-56 object-contain drop-shadow-[0_0_25px_rgba(255,20,147,0.7)] transform group-hover:scale-110 transition duration-300"
+                      ? 'border-brand-500 ring-2 ring-brand-500/30 scale-105 -translate-y-2 bg-gradient-to-t from-purple-900/50 via-purple-900/30 to-surface-0'
+                      : 'border-outline-variant hover:border-brand-500 bg-gradient-to-t from-surface-1 via-surface-2 to-surface-1 hover:scale-102 hover:-translate-y-1'
+                  }
+                `}
+                whileTap={{ scale: 0.99 }}
+                initial={{ opacity: 0, y: 40, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ delay: 0.08 * index, type: 'spring', stiffness: 500, damping: 30 }}
+              >
+                {/* Pattern Background */}
+                <motion.div
+                  className="absolute inset-0 opacity-10 mix-blend-overlay bg-[radial-gradient(#ff1493_1px,transparent_1px)] [background-size:16px_16px]"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 0.1 }}
+                  transition={{ delay: 0.3 }}
                 />
-              </div>
 
-              {/* Assigned Players Badges */}
-              <div className="z-10 min-h-[28px] flex items-center justify-center gap-1.5 flex-wrap">
-                {assignedPlayers.map((ap) => (
-                  <span
-                    key={ap.id}
-                    className="bg-black/80 border border-pink-400 text-[9px] font-black px-2 py-0.5 rounded-full text-pink-300 flex items-center space-x-1 shadow"
+                {/* Coach Badge Header */}
+                <div className="flex items-center justify-between z-10 relative">
+                  <motion.span
+                    className="px-3 py-1 rounded-full text-label-small font-black text-accent-400 bg-accent-500/15 border border-accent-500/30 uppercase tracking-widest shadow-sm"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.1 * index }}
                   >
-                    <img
-                      src={`https://api.dicebear.com/7.x/bottts/svg?seed=${ap.avatarSeed}`}
-                      className="w-3.5 h-3.5 rounded-full"
-                      alt={ap.name}
-                    />
-                    <span>{ap.name.split(' ')[0]}</span>
-                  </span>
-                ))}
-              </div>
+                    COACH {index + 1}
+                  </motion.span>
 
-              {/* Bottom Coach Name Pill */}
-              <div className="z-10 text-center pb-1 space-y-1 mt-2">
-                <div
-                  className={`py-2 rounded-xl font-black italic text-sm tracking-wider text-white shadow-lg transition border border-white/20 ${
-                    isAssignedToActive
-                      ? 'bg-gradient-to-r from-pink-600 to-purple-600'
-                      : 'bg-gradient-to-r from-blue-700 to-indigo-700 group-hover:from-pink-600 group-hover:to-purple-600'
-                  }`}
-                >
-                  {coach.name}
+                  <motion.span
+                    className={`
+                      text-label-small font-black px-2.5 py-1 rounded-full uppercase border
+                      ${diffColorMap[coach.difficulty] === 'success' ? 'bg-success-500/20 text-success-400 border-success-500/30' :
+                        diffColorMap[coach.difficulty] === 'warning' ? 'bg-sun-500/20 text-sun-400 border-sun-500/30' :
+                        'bg-error-500/20 text-error-400 border-error-500/30'}
+                    `}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.1 * index }}
+                  >
+                    {coach.difficulty}
+                  </motion.span>
                 </div>
-                <div className="text-[10px] text-cyan-300 font-bold truncate">
-                  {coach.routineName || `Routine ${String.fromCharCode(65 + index)}`}
-                </div>
-              </div>
-            </div>
+
+                {/* Coach Avatar Illustration */}
+                <motion.div className="relative my-auto flex justify-center items-center z-10 flex-1" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 + 0.1 * index }}>
+                  <motion.div
+                    className={`
+                      absolute w-48 h-48 rounded-full blur-3xl transition-all motion-spring
+                      ${isAssignedToActive ? 'bg-brand-500/30 scale-110' : 'bg-brand-500/15 group-hover:bg-brand-500/25'}
+                    `}
+                  />
+                  <Avatar
+                    src={`https://api.dicebear.com/7.x/big-smile/svg?seed=${coach.avatarSeed || coach.name}`}
+                    alt={coach.name}
+                    name={coach.name}
+                    size="4xl"
+                    border
+                    borderColor={isAssignedToActive ? 'brand' : 'white'}
+                    className="drop-shadow-[0_0_40px_rgba(217,30,109,0.7)] group-hover:scale-105 transition-all motion-spring"
+                  />
+                </motion.div>
+
+                {/* Assigned Players Badges */}
+                <motion.div className="z-10 min-h-[36px] flex items-center justify-center gap-2 flex-wrap" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 + 0.1 * index }}>
+                  {assignedPlayers.map((ap) => (
+                    <Tooltip key={ap.id} content={ap.name} position="top">
+                      <motion.div
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-3/50 backdrop-blur border border-brand-500/30 text-brand-300 font-black text-label-small shadow-sm"
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ type: 'spring', stiffness: 500, damping: 17, delay: 0.05 * assignedPlayers.indexOf(ap) }}
+                        whileHover={{ scale: 1.05 }}
+                      >
+                        <Avatar
+                          src={`https://api.dicebear.com/7.x/bottts/svg?seed=${ap.avatarSeed}`}
+                          alt={ap.name}
+                          name={ap.name}
+                          size="xs"
+                          border
+                          borderColor="brand"
+                        />
+                        <span>{ap.name.split(' ')[0]}</span>
+                      </motion.div>
+                    </Tooltip>
+                  ))}
+                  {assignedPlayers.length === 0 && (
+                    <motion.span
+                      className="px-3 py-1.5 rounded-full bg-surface-3/50 text-on-surface-disabled text-label-small font-medium"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                    >
+                      No dancers assigned
+                    </motion.span>
+                  )}
+                </motion.div>
+
+                {/* Bottom Coach Name Pill */}
+                <motion.div className="z-10 text-center pb-1 space-y-2 mt-4" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 + 0.1 * index }}>
+                  <motion.div
+                    className={`
+                      py-3 rounded-xl font-black italic text-base tracking-wider text-white shadow-level-2 transition-all motion-spring border border-white/10
+                      ${isAssignedToActive
+                        ? 'bg-gradient-to-r from-brand-500 to-purple-600'
+                        : 'bg-gradient-to-r from-blue-700 to-indigo-700 group-hover:from-brand-500 group-hover:to-purple-600'
+                      }
+                    `}
+                    whileHover={{ scale: 1.02 }}
+                  >
+                    {coach.name}
+                  </motion.div>
+                  <motion.div className="text-label-small text-accent-400 font-bold truncate">
+                    {coach.routineName || `Routine ${String.fromCharCode(65 + index)}`}
+                  </motion.div>
+                </motion.div>
+              </motion.button>
+            </Tooltip>
           );
         })}
-      </div>
+      </motion.div>
 
       {/* Prominent Action Bar */}
-      <div className="w-full flex justify-center pt-2">
-        <button
-          onClick={handleStartGame}
-          className="px-8 py-3.5 bg-gradient-to-r from-pink-500 via-rose-500 to-yellow-400 hover:from-pink-400 hover:to-yellow-300 text-black text-sm md:text-base font-black italic tracking-wider rounded-full shadow-[0_0_35px_rgba(255,20,147,0.85)] border-2 border-white cursor-pointer transform hover:scale-105 transition flex items-center space-x-3"
-        >
-          <i className="fa-solid fa-play text-lg"></i>
-          <span>DANCE NOW WITH SELECTED COACH</span>
-        </button>
-      </div>
-    </section>
+      <motion.div
+        className="w-full flex justify-center pt-4"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+      >
+        <Tooltip content="Start dancing with the selected coach" position="top">
+          <motion.button
+            onClick={handleStartGame}
+            className="px-10 py-4 bg-gradient-to-r from-brand-500 via-rose-500 to-sun-400 hover:from-brand-400 hover:to-sun-300 text-white text-base md:text-lg font-black italic tracking-wider rounded-full shadow-brand-glow-lg hover:shadow-brand-glow border-2 border-white/20 flex items-center gap-4"
+            whileHover={{ scale: 1.03, boxShadow: 'var(--shadow-level-4)' }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <motion.svg
+              className="w-6 h-6"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              initial={{ scale: 0, rotate: -180 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 17 }}
+            >
+              <polygon points="5 3 19 12 5 21 5 3" />
+            </motion.svg>
+            <span>DANCE NOW WITH SELECTED COACH</span>
+          </motion.button>
+        </Tooltip>
+      </motion.div>
+    </motion.section>
   );
 };
+
+export default CoachSelectScreen;

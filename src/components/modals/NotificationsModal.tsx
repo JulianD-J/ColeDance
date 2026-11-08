@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { soundEngine } from '../../services/soundEffects';
+import { Modal, Button, Badge, Chip, Tooltip, Card } from '../ui';
 
 interface NotificationsModalProps {
   onClose: () => void;
@@ -13,8 +15,8 @@ interface NotificationItem {
   title: string;
   desc: string;
   time: string;
-  icon: string;
-  color: string;
+  icon: React.ReactNode;
+  color: 'brand' | 'accent' | 'sun' | 'success' | 'error' | 'warning';
   actionText: string;
   action: 'songs' | 'training' | 'phone';
 }
@@ -25,8 +27,8 @@ const INITIAL_NOTIFICATIONS: NotificationItem[] = [
     title: 'New Headline Routine Available!',
     desc: 'Jump into "APT." by ROSÉ & Bruno Mars with 3-Coach multi-dancer formation.',
     time: 'Just now',
-    icon: 'fa-music',
-    color: 'from-pink-500 to-rose-600',
+    icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg>,
+    color: 'brand',
     actionText: 'DANCE NOW',
     action: 'songs',
   },
@@ -35,8 +37,8 @@ const INITIAL_NOTIFICATIONS: NotificationItem[] = [
     title: 'Coach Choreo Training Studio Ready',
     desc: 'Upload any local dance video to extract frame-by-frame 17-keypoint coach movements.',
     time: '1h ago',
-    icon: 'fa-graduation-cap',
-    color: 'from-yellow-400 to-amber-600',
+    icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></svg>,
+    color: 'sun',
     actionText: 'OPEN STUDIO',
     action: 'training',
   },
@@ -45,12 +47,21 @@ const INITIAL_NOTIFICATIONS: NotificationItem[] = [
     title: 'Phone Controller Motion Sync',
     desc: 'Use your smartphone gyroscope & accelerometer as a wireless motion controller.',
     time: '2h ago',
-    icon: 'fa-mobile-screen-button',
-    color: 'from-cyan-400 to-blue-600',
+    icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="5" y="2" width="14" height="20" rx="2" /><line x1="12" y1="18" x2="12.01" y2="18" /></svg>,
+    color: 'accent',
     actionText: 'PAIR PHONE',
     action: 'phone',
   },
 ];
+
+const colorStyles = {
+  brand: 'from-brand-500 to-brand-600',
+  accent: 'from-accent-500 to-accent-600',
+  sun: 'from-sun-500 to-sun-600',
+  success: 'from-success-500 to-success-600',
+  error: 'from-error-500 to-error-600',
+  warning: 'from-sun-500 to-error-500',
+};
 
 export const NotificationsModal: React.FC<NotificationsModalProps> = ({
   onClose,
@@ -79,100 +90,93 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 select-none">
-      <div className="max-w-md w-full bg-[#130b33]/95 border-2 border-pink-500/80 rounded-3xl p-5 sm:p-6 shadow-[0_0_50px_rgba(255,20,147,0.4)] text-white space-y-4">
-        {/* Header */}
-        <div className="flex justify-between items-center pb-3 border-b border-white/10">
-          <div className="flex items-center space-x-2.5">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-pink-500 to-purple-600 flex items-center justify-center text-lg text-white shadow-lg">
-              <i className="fa-solid fa-bell"></i>
-            </div>
-            <div>
-              <h2 className="text-xl font-black italic tracking-wide text-white">NOTIFICATIONS</h2>
-              <p className="text-[11px] text-white/60">Updates, challenges, and dance events</p>
-            </div>
+    <Modal
+      isOpen={true}
+      onClose={() => { soundEngine.playClick(); onClose(); }}
+      title="NOTIFICATIONS"
+      description="Updates, challenges, and dance events"
+      size="lg"
+      variant="form"
+      showCloseButton={true}
+      footer={
+        notifications.length > 0 ? (
+          <div className="flex gap-3 w-full">
+            <Button variant="outlined" fullWidth onClick={handleClearAll}>Clear All</Button>
+            <Button variant="primary" fullWidth onClick={() => { soundEngine.playClick(); onClose(); }}>Close</Button>
           </div>
-
-          <button
-            onClick={() => {
-              soundEngine.playClick();
-              onClose();
-            }}
-            className="w-8 h-8 rounded-full bg-white/10 hover:bg-red-600/80 flex items-center justify-center text-white/70 hover:text-white transition cursor-pointer"
+        ) : (
+          <Button variant="primary" fullWidth onClick={() => { soundEngine.playClick(); onClose(); }}>Close</Button>
+        )
+      }
+    >
+      <motion.div
+        className="space-y-3 max-h-[60vh] overflow-y-auto pr-1"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        {notifications.length === 0 ? (
+          <motion.div
+            className="text-center py-12 text-on-surface-variant space-y-3"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 17 }}
           >
-            ✕
-          </button>
-        </div>
-
-        {/* Notifications List */}
-        <div className="space-y-2.5 max-h-[60vh] overflow-y-auto pr-1">
-          {notifications.map((item) => (
-            <div
-              key={item.id}
-              className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/10 transition space-y-2"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center space-x-2.5">
-                  <div
-                    className={`w-8 h-8 rounded-xl bg-gradient-to-tr ${item.color} flex items-center justify-center text-xs text-white shadow`}
-                  >
-                    <i className={`fa-solid ${item.icon}`}></i>
-                  </div>
-                  <div>
-                    <div className="text-xs font-black text-white">{item.title}</div>
-                    <div className="text-[10px] text-white/40">{item.time}</div>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => handleDismiss(item.id)}
-                  className="text-white/40 hover:text-white text-xs p-1"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <p className="text-[11px] text-white/70 leading-relaxed">{item.desc}</p>
-
-              <button
-                onClick={() => handleAction(item)}
-                className="w-full py-2 bg-gradient-to-r from-pink-500 to-rose-600 hover:scale-[1.01] text-white rounded-xl text-xs font-black italic shadow cursor-pointer transition flex items-center justify-center space-x-1.5"
+            <motion.div className="w-16 h-16 rounded-full bg-success-500/20 text-success-400 flex items-center justify-center mx-auto text-3xl" initial={{ scale: 0, rotate: -180 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 500, damping: 17 }}>
+              <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+            </motion.div>
+            <div className="text-body-medium font-semibold text-on-surface">All notifications caught up!</div>
+            <div className="text-body-small">No new updates at the moment.</div>
+          </motion.div>
+        ) : (
+          notifications.map((item, index) => (
+            <AnimatePresence key={item.id}>
+              <motion.div
+                className="bg-surface-1/50 border border-outline-variant rounded-2xl overflow-hidden"
+                initial={{ opacity: 0, x: -30 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 30, height: 0 }}
+                transition={{ delay: 0.05 * index, type: 'spring', stiffness: 500, damping: 30 }}
               >
-                <span>{item.actionText}</span>
-                <i className="fa-solid fa-arrow-right text-[10px]"></i>
-              </button>
-            </div>
-          ))}
+                <Card variant="filled" padding="md" className="space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className={`w-10 h-10 rounded-xl bg-gradient-to-tr ${colorStyles[item.color]} flex items-center justify-center text-white shadow-level-1 shrink-0`}>
+                        {item.icon}
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="text-body-medium font-black text-white truncate">{item.title}</h4>
+                        <p className="text-label-small text-on-surface-variant">{item.time}</p>
+                      </div>
+                    </div>
+                    <Tooltip content="Dismiss notification" position="left">
+                      <Button variant="ghost" size="xs" onClick={() => handleDismiss(item.id)}>
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                      </Button>
+                    </Tooltip>
+                  </div>
 
-          {notifications.length === 0 && (
-            <div className="text-center py-8 text-white/50 text-xs font-bold space-y-2">
-              <i className="fa-solid fa-circle-check text-2xl text-emerald-400"></i>
-              <div>All notifications caught up!</div>
-            </div>
-          )}
-        </div>
+                  <p className="text-body-small text-on-surface/80 leading-relaxed">{item.desc}</p>
 
-        {/* Footer */}
-        {notifications.length > 0 && (
-          <div className="pt-2 border-t border-white/10 flex justify-between items-center text-xs">
-            <button
-              onClick={handleClearAll}
-              className="text-white/50 hover:text-white transition font-bold cursor-pointer"
-            >
-              Clear All
-            </button>
-            <button
-              onClick={() => {
-                soundEngine.playClick();
-                onClose();
-              }}
-              className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl font-bold cursor-pointer transition"
-            >
-              Close
-            </button>
-          </div>
+                  <Tooltip content={item.actionText} position="bottom">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      fullWidth
+                      trailingIcon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="5 12 19 12" /><polyline points="13 5 19 12 13 19" /></svg>}
+                      onClick={() => handleAction(item)}
+                    >
+                      {item.actionText}
+                    </Button>
+                  </Tooltip>
+                </Card>
+              </motion.div>
+            </AnimatePresence>
+          ))
         )}
-      </div>
-    </div>
+      </motion.div>
+    </Modal>
   );
 };
+
+export default NotificationsModal;

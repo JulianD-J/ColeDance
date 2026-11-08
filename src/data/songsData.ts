@@ -1,4 +1,5 @@
 import { Song, YoloCoachFrame, YoloKeypoint } from '../types/game';
+import { deleteVideoBlob, clearAllVideoBlobs } from '../services/indexedDBStorage';
 
 /**
  * Generates realistic frame-by-frame 17 COCO keypoint trajectories for each coach (1 to 5).
@@ -198,7 +199,7 @@ export function saveCustomTrainedSong(song: Song): void {
   }
 }
 
-export function deleteCustomTrainedSong(songId: string): void {
+export async function deleteCustomTrainedSong(songId: string): Promise<void> {
   try {
     const existing = getCustomTrainedSongs();
     const updated = existing.filter((s) => s.id !== songId);
@@ -210,8 +211,21 @@ export function deleteCustomTrainedSong(songId: string): void {
       deleted.push(songId);
       localStorage.setItem(DELETED_SONGS_KEY, JSON.stringify(deleted));
     }
+
+    // Delete associated video blob from IndexedDB
+    await deleteVideoBlob(songId);
   } catch (e) {
     console.error('Error deleting song:', e);
+  }
+}
+
+export async function clearAllCustomSongs(): Promise<void> {
+  try {
+    localStorage.removeItem(LOCAL_STORAGE_KEY);
+    localStorage.removeItem(DELETED_SONGS_KEY);
+    await clearAllVideoBlobs();
+  } catch (e) {
+    console.error('Error clearing all songs:', e);
   }
 }
 
