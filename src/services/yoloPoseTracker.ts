@@ -1,8 +1,9 @@
 import * as ort from 'onnxruntime-web';
 import { YoloPersonDetection, YoloKeypoint, YoloCoachFrame, TargetPoseType } from '../types/game';
 
-// Configure ONNX Runtime Web WASM paths
-ort.env.wasm.wasmPaths = '/';
+// Configure ONNX Runtime Web WASM paths (supports subpath on GitHub Pages)
+const baseUrl = import.meta.env.BASE_URL || '/';
+ort.env.wasm.wasmPaths = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
 ort.env.wasm.numThreads = 1;
 ort.env.wasm.simd = false;
 
@@ -103,8 +104,9 @@ export class YoloPoseTracker {
 
     this.isModelLoading = true;
     try {
-      console.log('[YOLOv8-pose] Fetching model binary /models/yolov8n-pose.onnx...');
-      const response = await fetch('/models/yolov8n-pose.onnx');
+      const modelUrl = `${baseUrl.replace(/\/$/, '')}/models/yolov8n-pose.onnx`;
+      console.log(`[YOLOv8-pose] Fetching model binary ${modelUrl}...`);
+      const response = await fetch(modelUrl);
       if (!response.ok) {
         throw new Error(`Model fetch failed with status ${response.status}`);
       }

@@ -4,6 +4,7 @@ import { Song, Player } from '../types/game';
 import { soundEngine } from '../services/soundEffects';
 import { getRankConfig } from '../services/momentumScoring';
 import { exportCdncePackage, downloadCdnceBlob, importCdncePackage } from '../services/cdncePackageService';
+import heroConcertStageImg from '../assets/images/hero_concert_stage_1793632684690.jpg';
 import {
   Card,
   CardMedia,
@@ -169,7 +170,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         {/* Real High-Fidelity Concert Arena Backdrop */}
         <div className="absolute inset-0 z-0">
           <img
-            src="/src/assets/images/hero_concert_stage_1793632684690.jpg"
+            src={heroConcertStageImg}
             alt="ColeDance Concert Stage"
             className="w-full h-full object-cover object-center transform scale-105 filter brightness-75 contrast-110"
           />

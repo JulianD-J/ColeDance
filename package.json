@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build",
+    "gcp-build": "vite build",
     "start": "node server.ts",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit"
@@ -22,6 +23,7 @@
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "onnxruntime-web": "^1.31.1",
+    "peerjs": "^1.5.5",
     "qrcode": "^1.5.4",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",

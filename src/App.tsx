@@ -27,8 +27,12 @@ import { importCdncePackage } from './services/cdncePackageService';
 export default function App() {
   // Check if current view is mobile phone controller
   const queryParams = new URLSearchParams(window.location.search);
+  const routeParam = queryParams.get('route');
   const isControllerView =
-    queryParams.get('controller') === 'true' || window.location.pathname === '/controller';
+    queryParams.get('controller') === 'true' ||
+    routeParam === 'controller' ||
+    window.location.pathname.endsWith('/controller') ||
+    window.location.pathname.endsWith('/controller/');
 
   if (isControllerView) {
     return <PhoneController />;

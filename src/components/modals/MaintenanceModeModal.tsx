@@ -143,7 +143,8 @@ export const MaintenanceModeModal: React.FC<MaintenanceModeModalProps> = ({ onCl
     let sessionCreation = 'FAIL';
 
     try {
-      const resp = await fetch('/models/yolov8n-pose.onnx');
+      const modelUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/models/yolov8n-pose.onnx`;
+      const resp = await fetch(modelUrl);
       modelFetchStatus = resp.ok ? 'PASS' : 'FAIL';
       if (resp.ok) {
         const buffer = await resp.arrayBuffer();

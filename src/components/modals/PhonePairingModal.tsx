@@ -29,12 +29,19 @@ export const PhonePairingModal: React.FC<PhonePairingModalProps> = ({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
+  const getControllerUrl = () => {
+    const base = import.meta.env.BASE_URL || '/';
+    const normalizedBase = base.endsWith('/') ? base : `${base}/`;
+    return `${window.location.origin}${normalizedBase}?controller=true&room=${roomId}`;
+  };
+
+  const controllerUrl = getControllerUrl();
+
   useEffect(() => {
-    const controllerUrl = `${window.location.origin}/?controller=true&room=${roomId}`;
     QRCode.toDataURL(controllerUrl, { margin: 1, width: 220 })
       .then((url) => setQrDataUrl(url))
       .catch((err) => console.error(err));
-  }, [roomId]);
+  }, [controllerUrl]);
 
   const handleStartCameraTest = async () => {
     soundEngine.playClick();
@@ -62,8 +69,6 @@ export const PhonePairingModal: React.FC<PhonePairingModalProps> = ({
     }
     onClose();
   };
-
-  const controllerUrl = `${window.location.origin}/?controller=true&room=${roomId}`;
 
   return (
     <Modal
@@ -180,7 +185,7 @@ export const PhonePairingModal: React.FC<PhonePairingModalProps> = ({
               <Card variant="filled" padding="none" className="overflow-hidden">
                 <div className="relative w-full aspect-video bg-surface-0">
                   <img
-                    src="/assets/aistudio/image_ce122d29.png"
+                    src={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/assets/aistudio/image_ce122d29.png`}
                     alt="Dance Room Setup"
                     className="w-full h-full object-cover"
                   />

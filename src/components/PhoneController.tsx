@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { socketService } from '../services/socketService';
+import { peerService } from '../services/peerService';
 
 export const PhoneController: React.FC = () => {
   const queryParams = new URLSearchParams(window.location.search);
@@ -9,6 +9,8 @@ export const PhoneController: React.FC = () => {
   const [playerName, setPlayerName] = useState('');
   const [selectedColor, setSelectedColor] = useState('#ff1493');
   const [isConnected, setIsConnected] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [motionIntensity, setMotionIntensity] = useState(0);
   const [totalScore, setTotalScore] = useState(0);
   const [lastFeedback, setLastFeedback] = useState('READY');
@@ -37,19 +39,26 @@ export const PhoneController: React.FC = () => {
   };
 
   const handleJoin = () => {
-    if (!roomId.trim()) return;
+    if (!roomId.trim()) {
+      setErrorMessage('Please enter a valid room code');
+      return;
+    }
+    setErrorMessage('');
+    setIsConnecting(true);
     requestMotionPermission();
 
-    const socket = socketService.initSocket();
     const avatarSeed = `P_${Date.now()}`;
 
-    socketService.joinRoom(roomId.trim(), playerName || 'Dancer', avatarSeed, selectedColor);
+    // Connect directly via PeerJS WebRTC
+    peerService.joinRoom(roomId.trim(), playerName || 'Dancer', avatarSeed, selectedColor);
 
-    socket.on('joined_successfully', (data) => {
+    peerService.on('joined_successfully', () => {
       setIsConnected(true);
+      setIsConnecting(false);
+      setErrorMessage('');
     });
 
-    socket.on('haptic_feedback', (data: { feedback: string; pointsAdded: number; totalScore: number }) => {
+    peerService.on('haptic_feedback', (data: { feedback: string; pointsAdded: number; totalScore: number }) => {
       setLastFeedback(data.feedback);
       setTotalScore(data.totalScore);
 
@@ -59,8 +68,15 @@ export const PhoneController: React.FC = () => {
       }
     });
 
-    socket.on('join_error', (msg: string) => {
-      alert(msg);
+    peerService.on('join_error', (msg: string) => {
+      setIsConnecting(false);
+      setErrorMessage(msg);
+    });
+
+    peerService.on('disconnected', () => {
+      setIsConnected(false);
+      setIsConnecting(false);
+      setErrorMessage('Disconnected from host.');
     });
   };
 
@@ -88,7 +104,7 @@ export const PhoneController: React.FC = () => {
       setMotionIntensity(Math.min(100, Math.floor(intensity * 3)));
 
       if (intensity > 8) {
-        socketService.sendMotionData({ x, y, z }, { alpha: 0, beta: 0, gamma: 0 }, intensity);
+        peerService.sendMotionData({ x, y, z }, { alpha: 0, beta: 0, gamma: 0 }, intensity);
       }
     };
 
@@ -102,7 +118,7 @@ export const PhoneController: React.FC = () => {
   const handleManualShake = () => {
     const fakeIntensity = 22;
     setMotionIntensity(80);
-    socketService.sendMotionData({ x: 10, y: 15, z: 5 }, { alpha: 0, beta: 0, gamma: 0 }, fakeIntensity, 'SHAKE');
+    peerService.sendMotionData({ x: 10, y: 15, z: 5 }, { alpha: 0, beta: 0, gamma: 0 }, fakeIntensity, 'SHAKE');
 
     if (navigator.vibrate) {
       navigator.vibrate(50);
@@ -121,8 +137,14 @@ export const PhoneController: React.FC = () => {
             <h1 className="text-2xl font-black italic tracking-wider text-white">
               COLE<span className="text-pink-500">DANCE</span>
             </h1>
-            <p className="text-xs text-white/70">Smartphone Motion Controller</p>
+            <p className="text-xs text-white/70">Smartphone Motion Controller (PeerJS P2P)</p>
           </div>
+
+          {errorMessage && (
+            <div className="px-3 py-2 bg-red-950/80 border border-red-500/80 rounded-xl text-red-200 text-xs text-center font-bold animate-pulse">
+              {errorMessage}
+            </div>
+          )}
 
           <div className="space-y-3 text-left">
             <div>
@@ -166,9 +188,14 @@ export const PhoneController: React.FC = () => {
 
           <button
             onClick={handleJoin}
-            className="w-full py-4 bg-gradient-to-r from-pink-500 to-purple-600 text-white font-black italic rounded-2xl shadow-2xl text-base tracking-wider hover:scale-105 active:scale-95 transition cursor-pointer"
+            disabled={isConnecting}
+            className={`w-full py-4 text-white font-black italic rounded-2xl shadow-2xl text-base tracking-wider transition cursor-pointer ${
+              isConnecting
+                ? 'bg-zinc-700 opacity-80 cursor-wait'
+                : 'bg-gradient-to-r from-pink-500 to-purple-600 hover:scale-105 active:scale-95'
+            }`}
           >
-            JOIN GAME AS CONTROLLER
+            {isConnecting ? 'CONNECTING VIA PEERJS...' : 'JOIN GAME AS CONTROLLER'}
           </button>
         </div>
       </main>

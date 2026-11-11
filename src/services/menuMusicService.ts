@@ -11,8 +11,10 @@ class MenuMusicService {
 
   private init() {
     if (!this.audio) {
-      // Local Just Dance electronic menu groove
-      this.audio = new Audio('/audio/80s_vibe.mp3');
+      // Local Just Dance electronic menu groove (respects GitHub Pages base URL)
+      const base = import.meta.env.BASE_URL || '/';
+      const normalizedBase = base.endsWith('/') ? base : `${base}/`;
+      this.audio = new Audio(`${normalizedBase}audio/80s_vibe.mp3`);
       this.audio.loop = true;
       this.audio.volume = this.isMuted ? 0 : 0.40;
     }
